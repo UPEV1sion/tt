@@ -6,6 +6,8 @@
 #include <dirent.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #define shift_args(argc, argv)((argc)--, *(argv)++)
 #define ARRAY_LEN(a)(sizeof(a)/sizeof(a[0]))
@@ -19,23 +21,6 @@
     } while(0)
 
 #define BUFSIZE 1024
-
-#define DA_GROW_SIZE 2
-#define DA_INIT_CAP 64
-
-#define da_append(da, item) \
-    do { \
-        if((da)->count >= (da)->capacity) \
-        { \
-            if((da)->capacity == 0) (da)->capacity = DA_INIT_CAP; \
-            while((da)->count >= (da)->capacity) (da)->capacity *= DA_GROW_SIZE; \
-            (da)->items = realloc((da)->items, (da)->capacity * sizeof(*(da)->items)); \
-            assert((da)->items, "ERROR: out of mem!\n"); \
-        } \
-        (da)->items[(da)->count++] = item; \
-    } while(0)
-
-#define da_foreach(type, name, da) for(type *name = (da)->items; name < (da)->items + (da)->count; ++name)
 
 #define OP_LIST\
     X(OP_AND) \
@@ -51,6 +36,30 @@ typedef enum {
     OP_LIST
 #undef X
 } OpCode;
+
+typedef struct {
+    size_t count;
+    size_t capacity;
+    char *items;
+} StringBuilder;
+
+typedef struct {
+    const char *s;
+    size_t len;
+} StringView;
+
+typedef struct {
+    size_t count;
+    size_t capacity;
+    StringView *items;
+} Tags;
+
+typedef struct {
+    StringView title;
+    StringView status;
+    long prio;
+    Tags tags;
+} Task;
 
 typedef struct {
     OpCode code;
@@ -99,6 +108,96 @@ typedef struct {
     Token *last_tok;
     int cur_char;
 } Lexer;
+
+#define DA_GROW_SIZE 2
+#define DA_INIT_CAP 64
+
+#define da_reserve(da, expected) \
+    do { \
+        if((expected) > (da)->capacity) \
+        { \
+            if((da)->capacity == 0) (da)->capacity = DA_INIT_CAP; \
+            while((expected) > (da)->capacity) (da)->capacity *= DA_GROW_SIZE; \
+            (da)->items = realloc((da)->items, (da)->capacity * sizeof(*(da)->items)); \
+            assert((da)->items, "ERROR: out of mem!\n"); \
+        } \
+    while(0)
+
+#define da_append(da, item) \
+    do { \
+        da_reserve((da), (da)->count + 1); \
+        (da)->items[(da)->count++] = (item); \
+    } while(0)
+
+#define sb_append(sb, s) \
+    do { \
+        const size_t len = strlen(s); \
+        da_reserve((sb), (sb)->count + len); \
+        memcpy((da)->items + (da)->count, (s), len); \
+    while(0)
+
+#define da_foreach(type, name, da) for(type *name = (da)->items; name < (da)->items + (da)->count; ++name)
+
+StringView sv_from_sb(const StringBuilder *sb)
+{
+    return (StringView) {
+        .s = sb->items,
+        .len = sb->count
+    };
+}
+
+StringView sv_chop(StringView *sv, const int delim)
+{
+    if(sv->len == 0) return (StringView) {NULL, 0};
+
+    size_t i;
+    for(i = 0; i < sv->len && sv->s[i] != (unsigned char) delim; ++i)
+        ;
+
+    const StringView ret = {sv->s, i}; 
+    sv->s += i;
+    sv->len -= i;
+
+    return ret;
+}
+
+bool sv_is_prefix(StringView sv, const char *prefix)
+{
+    const size_t len = strlen(prefix);
+    if(sv.len < len) return false;
+
+    for(size_t i = 0; i < len; ++i)
+    {
+        if(sv.s[i] != prefix[i]) return false;
+    }
+
+    return true;
+}
+
+StringView sv_trim(StringView sv)
+{
+    while(sv.len > 0 && isspace((unsigned char) *sv.s))
+    {
+        sv.s++;
+        sv.len--;
+    }
+
+    while(sv.len > 0 && isspace((unsigned char) sv.s[sv.len]))
+    {
+        sv.len--;
+    }
+
+    return sv;
+}
+
+char* cstr_from_sv(const StringView sv)
+{
+    char *str;
+    assert((str = malloc(sv.len + 1)) != NULL, "Could not allocate cstr\n");
+    memcpy(str, sv.s, sv.len);
+    str[sv.len] = 0;
+    return str;
+}
 
 Token* token_new(const TokenType type, const char *lexeme, const size_t pos)
 {
@@ -200,7 +299,6 @@ Lexer *lexer_new(const char *source_code)
 
 Op* op_new(const OpCode code, const char *lexeme)
 {
-
     Op *op = malloc(sizeof(Op));
     assert(op != NULL, "ERROR: Count not create op!\n");
     op->code = code;
@@ -223,6 +321,7 @@ char* op_to_str(const Op *op)
 void print_usage(const char *program)
 {
     printf("USAGE: %s <flags>\n", program);
+    printf("    -h, --help:      print help\n");
     printf("    -n, --new:       create a new task\n");
     printf("    -d, --date:      sort by creation date\n");
     printf("    -p, --priority:  sort by priority\n");
@@ -232,7 +331,7 @@ void print_usage(const char *program)
     printf("        example: -f \".unfinished and not (.feature or .refactor)\"\n");
 }
 
-void current_timestamp(char *buffer, size_t buffer_size)
+void current_timestamp(char *buffer, const size_t buffer_size)
 {
     const time_t t = time(NULL);
     assert(t > -1, "Could not get time: %s\n", strerror(errno));
@@ -358,16 +457,143 @@ void parse_expr(Lexer *lexer, Ops *ops)
     }
 }
 
+int read_file(StringBuilder *sb, const char *path)
+{
+    FILE *f;
+    assert((f = fopen(path, "r")) != NULL, "Could not open file %s\n", path);
+    fseek(f, 0, SEEK_END);
+    const long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
 
+    da_reserve(sb, sb->count + size);
+    fread(sb->items + sb->count, size, 1, f);
+    assert(ferror(f) == 0, "ERROR: Could not read file %s\n", path);
+    fclose(f);
 
+    return 0;
+}
+
+Task parse_task(const char *path)
+{
+    StringBuilder sb = {0};
+    read_file(&sb, path);
+    StringView sv = sv_from_sb(&sb);
+
+    Task task = {0};
+    StringView title = sv_chop(&sv, '\n');
+    sv_chop(&sv, '\n');
+
+    StringView meta;
+    while((meta = sv_chop(&sv, '\n')).len > 0)
+    {
+        if(sv_is_prefix(meta, "- PRIORITY"))
+        {
+            StringView prio = sv_chop(&meta, ':');
+            prio = sv_trim(prio);
+            char *prio_str = cstr_from_sv(prio);
+
+            char *endptr;
+            const long num = strtol(prio_str, &endptr, 10);
+            assert(*endptr == 0, "ERROR: count not parse priority: %s\n", prio_str);
+
+            task.prio = num;
+            free(prio_str);
+        }
+        else if(sv_is_prefix(meta, "- STATUS"))
+        {
+            task.status = meta;
+        }
+        else if(sv_is_prefix(meta, "- TAGS"))
+        {
+            sv_chop(&meta, ':');
+            StringView trimmed = sv_trim(meta); 
+            if(trimmed.len == 0)
+            {
+                fprintf(stderr, "ERROR: Malformed 'TAGS' header in %s\n", path);
+                exit(1);
+            }
+
+            StringView tag;
+            while((tag = sv_chop(&trimmed, ',')).len > 0)
+            {
+                tag = sv_trim(tag);
+                da_append(&task.tag, tag);
+            }
+        }
+        else if(*meta.s == '-')
+        {
+            fprintf(stderr, "ERROR: Invalid task header \"%.*s\" in %s\n", meta.len, meta.s, path);
+            exit(1);
+        }
+        else if(*meta.s == '\n')
+        {
+            break;
+        }
+    }
+
+    return task;
+}
+
+void load_tasks(Tasks *tasks)
+{
+    const DIR *dir = opendir("./tasks");
+    if(dir == NULL)
+    {
+        fprintf(stderr, "ERROR: No 'tasks' folder found!\n");
+        fprintf(stderr, "INFO: Creating new 'tasks' folder\n");
+        if(mkdir("./tasks", 0755) != 0)
+        {
+            fprintf(stderr, "ERROR: Could not create 'tasks' folder: %s", strerror(errno));
+            exit(1);
+        }
+
+        return;
+    }
+
+    errno = 0;
+    struct dirent dir_entry;
+    while((dir_entry = readdir(dir)) != NULL)
+    {
+        assert(dir_entry->d_type == DT_DIR, 
+                "ERROR: malformed 'tasks' folder. Please remove './tasks/%'!\n", dir_entry->d_name);
+        char path[BUFSIZE];
+        snprintf(path, BUFSIZE, "./tasks/%s/TASK.md", dir_entry->d_name);
+        Task task = parse_task(path);
+        da_append(task, tasks);
+    }
+
+    assert(closedir(dir) == 0, "ERROR: Could not close 'tasks' folder: %s\n", strerror(errno));    
+    assert(errno == 0, "ERROR: Could not properly read 'tasks' folder: %s\n", strerror(errno));
+}
+
+void dump_tasks(void)
+{
+    Tasks tasks = {0};
+    load_tasks(&tasks);
+    da_sort(&tasks);
+    da_foreach(Task, task, &tasks)
+    {
+        printf("%s: [PRIORITY: %d", task->path, task->priority);
+        if(task->tags.count > 0) 
+        {
+            printf(", TAGS: ");
+            printf("%s", *task->tags->items);
+            for(size_t i = 1; i < task->tags.count; ++i)
+            {
+                printf(", %s", task->tags.items[i]);
+            } 
+        }
+        printf("] %s", task->description);
+    }
+}
 
 int main(int argc, char **argv)
 {
     const char *program = shift_args(argc, argv);
     if(argc <= 0)
     {
-        print_usage(program);
-        return 1;
+        dump_tasks();
+        return 0;
     }
 
     while(argc > 0)
@@ -400,6 +626,10 @@ int main(int argc, char **argv)
         else if(0 == strcmp("-p", flag) || 0 == strcmp("--priority", flag))
         {
             assert(false, "TODO");
+        }
+        else if(0 == strcmp("-h", flag) || 0 == strcmp("--help", flag))
+        {
+            print_usage();
         }
         else
         {
