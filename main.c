@@ -41,6 +41,8 @@
     X(OP_OR) \
     X(OP_NOT) \
     X(OP_TAG) \
+    X(OP_TAGGED) \
+    X(OP_UNTAGGED) \
     X(OP_ID)
 
 typedef enum {
@@ -61,6 +63,8 @@ typedef enum {
     TOK_LPAREN,
     TOK_RPAREN,
     TOK_TAG,
+    TOK_TAGGED,
+    TOK_UNTAGGED,
     TOK_ID,
 } TokenType;
 
@@ -129,22 +133,6 @@ Token* lexer_next_tok(Lexer *lexer)
             tok = token_new(TOK_RPAREN, ")", lexer->pos);
             lexer_advance(lexer);
         } break;
-        case '!': {
-            tok = token_new(TOK_NOT, "!", lexer->pos);
-            lexer_advance(lexer);
-        }  break;
-        case '&': {
-            const size_t pos = lexer->pos;
-            lexer_match_char(lexer, '&');
-            tok = token_new(TOK_AND, "&&", pos);
-            lexer_advance(lexer);
-        } break;
-        case '|': {
-            const size_t pos = lexer->pos;
-            lexer_match_char(lexer, '|');
-            tok = token_new(TOK_OR, "||", pos);
-            lexer_advance(lexer);
-        } break;
         default : {
             if(lexer->cur_char == '.' || isalpha(lexer->cur_char))
             {
@@ -158,7 +146,34 @@ Token* lexer_next_tok(Lexer *lexer)
                 } while(isalnum(lexer->cur_char) && pos < BUFSIZE - 1);
 
                 buffer[pos] = 0;
-                tok = token_new((buffer[0] == '.') ? TOK_TAG : TOK_ID, buffer, lexer->pos);
+                if(*buffer == '.')
+                {
+                    tok = token_new(TOK_TAG, buffer, lexer->pos);
+                }
+                else if(0 == strcmp("and", buffer))
+                {
+                    tok = token_new(TOK_AND, buffer, lexer->pos);
+                }
+                else if(0 == strcmp("or", buffer))
+                {
+                    tok = token_new(TOK_OR, buffer, lexer->pos);
+                }
+                else if(0 == strcmp("not", buffer))
+                {
+                    tok = token_new(TOK_NOT, buffer, lexer->pos);
+                }
+                else if(0 == strcmp("tagged", buffer))
+                {
+                    tok = token_new(TOK_TAGGED, buffer, lexer->pos);
+                }
+                else if(0 == strcmp("untagged", buffer))
+                {
+                    tok = token_new(TOK_UNTAGGED, buffer, lexer->pos);
+                }
+                else
+                {
+                    tok = token_new(TOK_ID, buffer, lexer->pos);
+                }
             }
         } break;
     }
@@ -215,7 +230,7 @@ void current_timestamp(char *buffer, size_t buffer_size)
     assert(t > -1, "Could not get time: %s\n", strerror(errno));
     const struct tm *lt = localtime(&t);
     assert(lt != NULL, "Could not get localtime: %s\n", strerror(errno));
-    assert(strftime(buffer, buffer_size, "%F-%H-%M-%S", lt) > 0, "ERROR: could not format time!\n");
+    assert(strftime(buffer, buffer_size, "%Y%m%d-%H%M%S", lt) > 0, "ERROR: could not format time!\n");
 }
 
 bool match(Lexer *lexer, const TokenType type)
@@ -231,7 +246,6 @@ bool match(Lexer *lexer, const TokenType type)
     return false;
 }
 
-void parse_primary(Lexer *lexer, Ops *ops);
 void parse_unary(Lexer *lexer, Ops *ops);
 void parse_and(Lexer *lexer, Ops *ops);
 void parse_or(Lexer *lexer, Ops *ops);
@@ -252,6 +266,20 @@ void parse_primary(Lexer *lexer, Ops *ops)
         return;
     }
 
+    if(match(lexer, TOK_TAGGED))
+    {
+        Op *op = op_new(OP_TAGGED, lexer->last_tok->lexeme);
+        da_append(ops, op);
+        return;
+    }
+
+    if(match(lexer, TOK_UNTAGGED))
+    {
+        Op *op = op_new(OP_UNTAGGED, lexer->last_tok->lexeme);
+        da_append(ops, op);
+        return;
+    }
+
     if(match(lexer, TOK_LPAREN))
     {
         Token *lparen = lexer->last_tok;
@@ -261,7 +289,7 @@ void parse_primary(Lexer *lexer, Ops *ops)
             fprintf(stderr, "ERROR: non matching parenthesis!\n");
             fprintf(stderr, "\"%s\"\n", lexer->input);
             const size_t caret1 = lparen->pos;
-            const size_t caret2 = lexer->last_tok->pos - caret1;
+            const size_t caret2 = lexer->last_tok->pos - caret1 - 1;
             fprintf(stderr, "%*s^%*s^\n", (int) caret1, "", (int) caret2, "");
             exit(1);
         }
@@ -269,7 +297,7 @@ void parse_primary(Lexer *lexer, Ops *ops)
         return;
     }
 
-    fprintf(stderr, "ERROR: expected primary expression: ID, TAG or '('\n");
+    fprintf(stderr, "ERROR: expected primary expression: ID, Keyword or '('\n");
     fprintf(stderr, "\"%s\"\n", lexer->input);
     const size_t caret = lexer->last_tok->pos;
     fprintf(stderr, "%*s^\n", (int) caret, "");
