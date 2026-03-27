@@ -7,7 +7,6 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <sys/stat.h>
-#include <sys/types.h>
 
 #define shift_args(argc, argv)((argc)--, *(argv)++)
 #define ARRAY_LEN(a)(sizeof(a)/sizeof(a[0]))
@@ -19,6 +18,9 @@
             exit(1); \
         } \
     } while(0)
+
+#define SV_FMT "%.*s"
+#define SV_ARG(sv) (int) (sv).len, (sv).s
 
 #define BUFSIZE 1024
 
@@ -55,11 +57,18 @@ typedef struct {
 } Tags;
 
 typedef struct {
+    StringView id;
     StringView title;
     StringView status;
     long prio;
     Tags tags;
 } Task;
+
+typedef struct {
+    size_t count;
+    size_t capacity;
+    Task *items;
+} Tasks;
 
 typedef struct {
     OpCode code;
@@ -109,19 +118,28 @@ typedef struct {
     int cur_char;
 } Lexer;
 
+typedef enum {
+    SORT_TIMESTAMP,
+    SORT_PRIO,
+} SortTarget;
+
+typedef struct {
+    SortTarget target;
+    bool desc;
+} SortOptions;
+
 #define DA_GROW_SIZE 2
 #define DA_INIT_CAP 64
 
 #define da_reserve(da, expected) \
     do { \
-        if((expected) > (da)->capacity) \
-        { \
+        if((expected) > (da)->capacity) { \
             if((da)->capacity == 0) (da)->capacity = DA_INIT_CAP; \
             while((expected) > (da)->capacity) (da)->capacity *= DA_GROW_SIZE; \
             (da)->items = realloc((da)->items, (da)->capacity * sizeof(*(da)->items)); \
             assert((da)->items, "ERROR: out of mem!\n"); \
         } \
-    while(0)
+    } while(0)
 
 #define da_append(da, item) \
     do { \
@@ -134,9 +152,10 @@ typedef struct {
         const size_t len = strlen(s); \
         da_reserve((sb), (sb)->count + len); \
         memcpy((da)->items + (da)->count, (s), len); \
-    while(0)
+    } while(0)
 
 #define da_foreach(type, name, da) for(type *name = (da)->items; name < (da)->items + (da)->count; ++name)
+#define da_sort(da, cmp) qsort((da)->items, (da)->count, sizeof(*(da)->items), cmp)
 
 StringView sv_from_sb(const StringBuilder *sb)
 {
@@ -161,7 +180,7 @@ StringView sv_chop(StringView *sv, const int delim)
     return ret;
 }
 
-bool sv_is_prefix(StringView sv, const char *prefix)
+bool sv_is_prefix(const StringView sv, const char *prefix)
 {
     const size_t len = strlen(prefix);
     if(sv.len < len) return false;
@@ -193,10 +212,20 @@ StringView sv_trim(StringView sv)
 char* cstr_from_sv(const StringView sv)
 {
     char *str;
-    assert((str = malloc(sv.len + 1)) != NULL, "Could not allocate cstr\n");
+    assert((str = malloc(sv.len + 1)) != NULL, "ERROR: Could not allocate cstr\n");
     memcpy(str, sv.s, sv.len);
     str[sv.len] = 0;
     return str;
+}
+
+StringView sv_from_cstr(const char *s)
+{
+    const char *dupped = strdup(s);
+    assert(dupped != NULL, "ERROR: Could not duplicate string\n");
+    return (StringView) {
+        .s = dupped,
+        .len = strlen(dupped)
+    };
 }
 
 Token* token_new(const TokenType type, const char *lexeme, const size_t pos)
@@ -316,19 +345,6 @@ char* op_to_str(const Op *op)
 #undef X
     default: return NULL;
     }
-}
-
-void print_usage(const char *program)
-{
-    printf("USAGE: %s <flags>\n", program);
-    printf("    -h, --help:      print help\n");
-    printf("    -n, --new:       create a new task\n");
-    printf("    -d, --date:      sort by creation date\n");
-    printf("    -p, --priority:  sort by priority\n");
-    printf("    -f, --filter:    filter existing tasks\n");
-    printf("        syntax: '.<tag>', 'and', 'or', 'not', 'tagged', untagged, '(' and ')'\n");
-    printf("        example: -f \".bug or untagged\"\n");
-    printf("        example: -f \".unfinished and not (.feature or .refactor)\"\n");
 }
 
 void current_timestamp(char *buffer, const size_t buffer_size)
@@ -473,14 +489,19 @@ int read_file(StringBuilder *sb, const char *path)
     return 0;
 }
 
-Task parse_task(const char *path)
+Task parse_task(const StringView id)
 {
+    char path[BUFSIZE];
+    snprintf(path, BUFSIZE, "./tasks/"SV_FMT"/TASK.md", SV_ARG(id));
+
     StringBuilder sb = {0};
     read_file(&sb, path);
     StringView sv = sv_from_sb(&sb);
 
     Task task = {0};
-    StringView title = sv_chop(&sv, '\n');
+    const StringView title = sv_chop(&sv, '\n');
+    task.title = title;
+    task.id = id;
     sv_chop(&sv, '\n');
 
     StringView meta;
@@ -517,12 +538,12 @@ Task parse_task(const char *path)
             while((tag = sv_chop(&trimmed, ',')).len > 0)
             {
                 tag = sv_trim(tag);
-                da_append(&task.tag, tag);
+                da_append(&task.tags, tag);
             }
         }
         else if(*meta.s == '-')
         {
-            fprintf(stderr, "ERROR: Invalid task header \"%.*s\" in %s\n", meta.len, meta.s, path);
+            fprintf(stderr, "ERROR: Invalid task header \""SV_FMT"\" in %s\n", SV_ARG(meta), path);
             exit(1);
         }
         else if(*meta.s == '\n')
@@ -536,7 +557,7 @@ Task parse_task(const char *path)
 
 void load_tasks(Tasks *tasks)
 {
-    const DIR *dir = opendir("./tasks");
+    DIR *dir = opendir("./tasks");
     if(dir == NULL)
     {
         fprintf(stderr, "ERROR: No 'tasks' folder found!\n");
@@ -551,39 +572,88 @@ void load_tasks(Tasks *tasks)
     }
 
     errno = 0;
-    struct dirent dir_entry;
+    struct dirent *dir_entry;
     while((dir_entry = readdir(dir)) != NULL)
     {
         assert(dir_entry->d_type == DT_DIR, 
-                "ERROR: malformed 'tasks' folder. Please remove './tasks/%'!\n", dir_entry->d_name);
-        char path[BUFSIZE];
-        snprintf(path, BUFSIZE, "./tasks/%s/TASK.md", dir_entry->d_name);
-        Task task = parse_task(path);
-        da_append(task, tasks);
+                "ERROR: malformed 'tasks' folder. Please remove './tasks/%s!\n", dir_entry->d_name);
+        StringView id = sv_from_cstr(dir_entry->d_name);
+        const Task task = parse_task(id);
+        da_append(tasks, task);
     }
 
     assert(closedir(dir) == 0, "ERROR: Could not close 'tasks' folder: %s\n", strerror(errno));    
     assert(errno == 0, "ERROR: Could not properly read 'tasks' folder: %s\n", strerror(errno));
 }
 
+int task_cmp(const void *a, const void *b);
+
 void dump_tasks(void)
 {
     Tasks tasks = {0};
     load_tasks(&tasks);
-    da_sort(&tasks);
+    da_sort(&tasks, task_cmp);
     da_foreach(Task, task, &tasks)
     {
-        printf("%s: [PRIORITY: %d", task->path, task->priority);
+        printf("./tasks/"SV_FMT"/TASK.md: [PRIORITY: %ld", SV_ARG(task->id), task->prio);
         if(task->tags.count > 0) 
         {
             printf(", TAGS: ");
-            printf("%s", *task->tags->items);
+            printf(SV_FMT, SV_ARG(*task->tags.items));
             for(size_t i = 1; i < task->tags.count; ++i)
             {
-                printf(", %s", task->tags.items[i]);
+                printf(", "SV_FMT, SV_ARG(task->tags.items[i]));
             } 
         }
-        printf("] %s", task->description);
+        printf("] "SV_FMT"\n", SV_ARG(task->title));
+    }
+}
+
+void print_usage(const char *program)
+{
+    printf("USAGE: %s <flags>\n", program);
+    printf("    -h, --help:      print help\n");
+    printf("    -n, --new:       create a new task\n");
+    printf("    -d, --date:      sort by creation date\n");
+    printf("    -p, --priority:  sort by priority (default)\n");
+    printf("    -f, --filter:    filter existing tasks\n");
+    printf("        syntax: '.<tag>', 'and', 'or', 'not', 'tagged', untagged, '(' and ')'\n");
+    printf("        example: -f \".bug or untagged\"\n");
+    printf("        example: -f \".unfinished and not (.feature or .refactor)\"\n");
+}
+
+static SortOptions sort_options = {.desc = true, .target = SORT_PRIO};
+
+int task_cmp(const void *a, const void *b)
+{
+    const Task *task_a = (const Task *)a;
+    const Task *task_b = (const Task *)b;
+    switch(sort_options.target)
+    {
+        case SORT_PRIO: {
+            if (sort_options.desc)
+            {
+                return (task_a->prio > task_b->prio) - (task_b->prio < task_a->prio);
+            }
+            return (task_a->prio < task_b->prio) - (task_b->prio > task_a->prio);
+        } break;
+        case SORT_TIMESTAMP: {
+            char *a_timestamp = cstr_from_sv(task_a->id);
+            char *b_timestamp = cstr_from_sv(task_b->id);
+            int ret = 0;
+            if (sort_options.desc)
+            {
+                ret = strcmp(a_timestamp, b_timestamp);
+            }
+            else
+            {
+                ret = strcmp(b_timestamp, a_timestamp);
+            }
+            free(a_timestamp);
+            free(b_timestamp);
+            return ret;
+        } break;
+        default: assert(false, "UNREACHABLE");
     }
 }
 
@@ -619,17 +689,20 @@ int main(int argc, char **argv)
                 puts("");
             }
         }
-        else if(0 == strcmp("-d", flag) || 0 == strcmp("--date", flag))
+        else if(0 == strcasecmp("-d", flag) || 0 == strcasecmp("--date", flag))
         {
-            assert(false, "TODO");
+            if (flag[1] == 'D') sort_options.desc = false;
+            sort_options.target = SORT_TIMESTAMP;
+            dump_tasks();
         }
-        else if(0 == strcmp("-p", flag) || 0 == strcmp("--priority", flag))
+        else if(0 == strcasecmp("-p", flag) || 0 == strcasecmp("--priority", flag))
         {
-            assert(false, "TODO");
+            if (flag[1] == 'P') sort_options.desc = false;
+            dump_tasks();
         }
         else if(0 == strcmp("-h", flag) || 0 == strcmp("--help", flag))
         {
-            print_usage();
+            print_usage(program);
         }
         else
         {
