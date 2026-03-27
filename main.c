@@ -1,6 +1,7 @@
 #include <time.h>
 #include <stdio.h>
 #include <errno.h>
+#include <ctype.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -16,6 +17,8 @@
         } \
     } while(0)
 
+#define BUFSIZE 1024
+
 #define DA_GROW_SIZE 2
 #define DA_INIT_CAP 64
 
@@ -25,7 +28,7 @@
         { \
             if((da)->capacity == 0) (da)->capacity = DA_INIT_CAP; \
             while((da)->count >= (da)->capacity) (da)->capacity *= DA_GROW_SIZE; \
-            (da)->items = realloc((da)->items, (da)->capacity); \
+            (da)->items = realloc((da)->items, (da)->capacity * sizeof(*(da)->items)); \
             assert((da)->items, "ERROR: out of mem!\n"); \
         } \
         (da)->items[(da)->count++] = item; \
@@ -33,17 +36,21 @@
 
 #define da_foreach(type, name, da) for(type *name = (da)->items; name < (da)->items + (da)->count; ++name)
 
+#define OP_LIST\
+    X(OP_AND) \
+    X(OP_OR) \
+    X(OP_NOT) \
+    X(OP_TAG) \
+    X(OP_ID)
+
 typedef enum {
-    OP_AND,
-    OP_OR,
-    OP_NOT,
-    OP_GROUPING,
-    OP_TAG,
-    OP_ID
+#define X(a) a,
+    OP_LIST
+#undef X
 } OpCode;
 
 typedef struct {
-    OpCode op;
+    OpCode code;
     const char *lexeme;
 } Op;
 
@@ -66,24 +73,131 @@ typedef struct {
 typedef struct {
     size_t count;
     size_t capacity;
-    Token **items;
+    Op **items;
 } Ops;
 
 typedef struct {
     size_t pos;
     const char *input;
+    Token *cur_tok;
     Token *last_tok;
-    int last_char;
+    int cur_char;
 } Lexer;
 
-Token* token_new(const TokenType type, const char *lexeme, const size_t n, const size_t pos)
+Token* token_new(const TokenType type, const char *lexeme, const size_t pos)
 {
     Token *tok = malloc(sizeof(Token));
     assert(tok != NULL, "ERROR: Count not create token!\n");
     tok->type = type;
-    tok->lexeme = strndup(lexeme, n);
+    tok->lexeme = strdup(lexeme);
     tok->pos = pos;
+
     return tok;
+}
+
+void lexer_advance(Lexer *lexer)
+{
+    lexer->cur_char = (unsigned char) lexer->input[lexer->pos++];
+}
+
+void lexer_trim_left(Lexer *lexer)
+{
+    while(isspace((unsigned char) lexer->cur_char))
+    {
+        lexer_advance(lexer);
+    }
+}
+
+void lexer_match_char(Lexer *lexer, const int c)
+{
+    assert(lexer->cur_char == c, "ERROR: unexpected char '%c'\n", c);
+    lexer_advance(lexer);
+}
+
+Token* lexer_next_tok(Lexer *lexer)
+{
+    lexer_trim_left(lexer);
+
+    Token *tok = NULL;
+    switch(lexer->cur_char)
+    {
+        case '(': {
+            lexer_advance(lexer);
+            tok = token_new(TOK_LPAREN, "(", lexer->pos); break;
+        }
+        case ')': {
+            lexer_advance(lexer);
+            tok = token_new(TOK_RPAREN, ")", lexer->pos); break;
+        }
+        case '!': {
+            lexer_advance(lexer);
+            tok = token_new(TOK_NOT, "!", lexer->pos);
+        }  break;
+        case '&': {
+            lexer_advance(lexer);
+            lexer_match_char(lexer, '&');
+            tok = token_new(TOK_AND, "&&", lexer->pos);
+        } break;
+        case '|': {
+            lexer_advance(lexer);
+            lexer_match_char(lexer, '|');
+            tok = token_new(TOK_OR, "||", lexer->pos);
+        } break;
+        default : {
+            if(lexer->cur_char == '.' || isalpha(lexer->cur_char))
+            {
+                size_t pos = 0;
+                char buffer[BUFSIZE];
+
+                do
+                {
+                    buffer[pos++] = (unsigned char) lexer->cur_char;
+                    lexer_advance(lexer);
+                } while(isalnum(lexer->cur_char) && pos < BUFSIZE - 1);
+
+                buffer[pos] = 0;
+                tok = token_new((buffer[0] == '.') ? TOK_TAG : TOK_ID, buffer, lexer->pos);
+            }
+        } break;
+    }
+
+    lexer->last_tok = lexer->cur_tok;
+    lexer->cur_tok = tok;
+    return tok;
+}
+
+Lexer *lexer_new(const char *source_code)
+{
+    Lexer *lexer = calloc(1, sizeof(Lexer));
+    assert(lexer != NULL, "ERROR: Could not allocate lexer\n");
+    lexer->input = strdup(source_code);
+    assert(lexer->input != NULL, "Could not allocate source string\n");
+    lexer_advance(lexer);
+    lexer_next_tok(lexer);
+
+    return lexer;
+}
+
+Op* op_new(const OpCode code, const char *lexeme)
+{
+
+    Op *op = malloc(sizeof(Op));
+    assert(op != NULL, "ERROR: Count not create op!\n");
+    op->code = code;
+    op->lexeme = lexeme != NULL ? strdup(lexeme) : NULL;
+
+    return op;
+}
+
+char* op_to_str(const Op *op)
+{
+    switch(op->code)
+    {
+#define X(a) case a: return #a;
+        OP_LIST
+#undef X
+    default: return NULL;
+    }
 }
 
 void print_usage(const char *program)
@@ -95,15 +209,17 @@ void print_usage(const char *program)
 
 void current_timestamp(char *buffer, size_t buffer_size)
 {
-    time_t t = time(NULL);
-    assert(t > -1, strerror(errno));
-    struct tm *lt = localtime(&t);
-    assert(lt != NULL, strerror(errno));
+    const time_t t = time(NULL);
+    assert(t > -1, "Could not get time: %s\n", strerror(errno));
+    const struct tm *lt = localtime(&t);
+    assert(lt != NULL, "Could not get localtime: %s\n", strerror(errno));
     assert(strftime(buffer, buffer_size, "%F-%H-%M-%S", lt) > 0, "ERROR: could not format time!\n");
 }
 
-bool match(Lexer *lexer, TokenType type)
+bool match(Lexer *lexer, const TokenType type)
 {
+    if (lexer->cur_tok == NULL) return false;
+
     if(lexer->cur_tok->type == type)
     {
         lexer_next_tok(lexer);
@@ -113,33 +229,70 @@ bool match(Lexer *lexer, TokenType type)
     return false;
 }
 
-Token* parse_primary(Lexer *lexer, Ops *ops)
-{
-    if(match(lexer, TOK_ID)) da_append(ops, lexer->last_tok);
-    if(
+void parse_primary(Lexer *lexer, Ops *ops);
+void parse_unary(Lexer *lexer, Ops *ops);
+void parse_and(Lexer *lexer, Ops *ops);
+void parse_or(Lexer *lexer, Ops *ops);
 
+void parse_primary(Lexer *lexer, Ops *ops)
+{
+    if(match(lexer, TOK_ID))
+    {
+        Op *op = op_new(OP_ID, lexer->last_tok->lexeme);
+        da_append(ops, op);
+        return;
+    }
+
+    if(match(lexer, TOK_TAG))
+    {
+        Op *op = op_new(OP_TAG, lexer->last_tok->lexeme);
+        da_append(ops, op);
+        return;
+    }
+
+    if(match(lexer, TOK_LPAREN))
+    {
+        parse_or(lexer, ops);
+        assert(match(lexer, TOK_RPAREN), "ERROR: expected closing ')'\n");
+        return;
+    }
+
+    assert(false, "ERROR: expected primary expression: ID, TAG or '('\n");
 }
 
-Token* parse_and(Lexer *lexer, Ops *ops)
+void parse_unary(Lexer *lexer, Ops *ops)
 {
-    Token *cur_tok = parse_primary(lexer, ops);
+    if(match(lexer, TOK_NOT))
+    {
+        parse_unary(lexer, ops);
+        Op *op = op_new(OP_NOT, NULL);
+        da_append(ops, op);
+        return;
+    }
+
+    parse_primary(lexer, ops);
+}
+
+void parse_and(Lexer *lexer, Ops *ops)
+{
+    parse_unary(lexer, ops);
     while(match(lexer, TOK_AND))
     {
-
+        parse_unary(lexer, ops);
+        Op *op = op_new(OP_AND, NULL);
+        da_append(ops, op);
     }
-
-    return cur_tok;
 }
 
-Token* parse_or(Lexer *lexer, Ops *ops)
+void parse_or(Lexer *lexer, Ops *ops)
 {
-    Token *cur_tok = parse_and(lexer, ops);
+    parse_and(lexer, ops);
     while(match(lexer, TOK_OR))
     {
-
+        parse_and(lexer, ops);
+        Op *op = op_new(OP_OR, NULL);
+        da_append(ops, op);
     }
-
-    return cur_tok;
 }
 
 void parse_expr(Lexer *lexer, Ops *ops)
@@ -169,13 +322,13 @@ int main(int argc, char **argv)
         {
             const char *filter = shift_args(argc, argv);
             assert(argc >= 0, "ERROR: no filter provided!\n");
-            Lexer lexer = { .input = filter };
+            Lexer *lexer = lexer_new(filter);
             Ops ops = {0};
-            da_append(&ops, token_new(TOK_AND, "and", 3, 0));
-            da_foreach(Token*, tok, &ops)
+            parse_expr(lexer, &ops);
+            da_foreach(Op*, op, &ops)
             {
-                printf("%s:%zu", (*tok)->lexeme, (*tok)->pos);
-            }          
+                printf("%s\n", op_to_str(*op));
+            }
         }
         else
         {
@@ -183,8 +336,6 @@ int main(int argc, char **argv)
             print_usage(program);
         }
     }
-
-
 
     return 0;
 }
