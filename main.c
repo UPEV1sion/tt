@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <ctype.h>
 #include <string.h>
+#include <dirent.h>
 #include <stdlib.h>
 #include <stdbool.h>
 
@@ -67,6 +68,17 @@ typedef enum {
     TOK_UNTAGGED,
     TOK_ID,
 } TokenType;
+
+struct {
+    TokenType type;
+    const char *lexeme;
+} keywords[] = {
+    {TOK_OR, "or"},
+    {TOK_AND, "and"},
+    {TOK_NOT, "not"},
+    {TOK_TAGGED, "tagged"},
+    {TOK_UNTAGGED, "untagged"},
+};
 
 typedef struct {
     TokenType type;
@@ -146,29 +158,19 @@ Token* lexer_next_tok(Lexer *lexer)
                 } while(isalnum(lexer->cur_char) && pos < BUFSIZE - 1);
 
                 buffer[pos] = 0;
+
+                for(size_t i = 0; i < ARRAY_LEN(keywords); ++i)
+                {
+                    if(0 == strcmp(keywords[i].lexeme, buffer))
+                    {
+                        tok = token_new(keywords[i].type, buffer, lexer->pos);
+                        goto end;
+                    }
+                }
+
                 if(*buffer == '.')
                 {
                     tok = token_new(TOK_TAG, buffer, lexer->pos);
-                }
-                else if(0 == strcmp("and", buffer))
-                {
-                    tok = token_new(TOK_AND, buffer, lexer->pos);
-                }
-                else if(0 == strcmp("or", buffer))
-                {
-                    tok = token_new(TOK_OR, buffer, lexer->pos);
-                }
-                else if(0 == strcmp("not", buffer))
-                {
-                    tok = token_new(TOK_NOT, buffer, lexer->pos);
-                }
-                else if(0 == strcmp("tagged", buffer))
-                {
-                    tok = token_new(TOK_TAGGED, buffer, lexer->pos);
-                }
-                else if(0 == strcmp("untagged", buffer))
-                {
-                    tok = token_new(TOK_UNTAGGED, buffer, lexer->pos);
                 }
                 else
                 {
@@ -178,6 +180,7 @@ Token* lexer_next_tok(Lexer *lexer)
         } break;
     }
 
+end:
     lexer->last_tok = lexer->cur_tok;
     lexer->cur_tok = tok;
     return tok;
@@ -221,7 +224,12 @@ void print_usage(const char *program)
 {
     printf("USAGE: %s <flags>\n", program);
     printf("    -n, --new:       create a new task\n");
+    printf("    -d, --date:      sort by creation date\n");
+    printf("    -p, --priority:  sort by priority\n");
     printf("    -f, --filter:    filter existing tasks\n");
+    printf("        syntax: '.<tag>', 'and', 'or', 'not', 'tagged', untagged, '(' and ')'\n");
+    printf("        example: -f \".bug or untagged\"\n");
+    printf("        example: -f \".unfinished and not (.feature or .refactor)\"\n");
 }
 
 void current_timestamp(char *buffer, size_t buffer_size)
@@ -350,6 +358,9 @@ void parse_expr(Lexer *lexer, Ops *ops)
     }
 }
 
+
+
+
 int main(int argc, char **argv)
 {
     const char *program = shift_args(argc, argv);
@@ -377,8 +388,18 @@ int main(int argc, char **argv)
             parse_expr(lexer, &ops);
             da_foreach(Op*, op, &ops)
             {
-                printf("%s\n", op_to_str(*op));
+                printf("%s", op_to_str(*op));
+                if((*op)->code == OP_TAG) printf(": %s", (*op)->lexeme);
+                puts("");
             }
+        }
+        else if(0 == strcmp("-d", flag) || 0 == strcmp("--date", flag))
+        {
+            assert(false, "TODO");
+        }
+        else if(0 == strcmp("-p", flag) || 0 == strcmp("--priority", flag))
+        {
+            assert(false, "TODO");
         }
         else
         {
