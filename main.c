@@ -855,6 +855,7 @@ int main(int argc, char **argv)
         else if(0 == strcmp("-h", flag) || 0 == strcmp("--help", flag))
         {
             print_usage(program);
+            return 0;
         }
         else
         {
