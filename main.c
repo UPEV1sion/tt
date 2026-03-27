@@ -252,12 +252,26 @@ void parse_primary(Lexer *lexer, Ops *ops)
 
     if(match(lexer, TOK_LPAREN))
     {
+        Token *lparen = lexer->last_tok;
         parse_or(lexer, ops);
-        assert(match(lexer, TOK_RPAREN), "ERROR: expected closing ')'\n");
+        if(!match(lexer, TOK_RPAREN))
+        {
+            fprintf(stderr, "ERROR: non matching parenthesis!\n");
+            fprintf(stderr, "\"%s\"\n", lexer->input);
+            const size_t caret1 = lparen->pos - 1;
+            const size_t caret2 = lexer->last_tok->pos - caret1 - 1;
+            fprintf(stderr, "%*s^%*s^\n", (int) caret1, "", (int) caret2, "");
+            exit(1);
+        }
+
         return;
     }
 
-    assert(false, "ERROR: expected primary expression: ID, TAG or '('\n");
+    fprintf(stderr, "ERROR: expected primary expression: ID, TAG or '('\n");
+    fprintf(stderr, "\"%s\"\n", lexer->input);
+    const size_t caret = lexer->last_tok->pos;
+    fprintf(stderr, "%*s^\n", (int) caret, "");
+    exit(1);
 }
 
 void parse_unary(Lexer *lexer, Ops *ops)
@@ -339,3 +353,4 @@ int main(int argc, char **argv)
 
     return 0;
 }
+
