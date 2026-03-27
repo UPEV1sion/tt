@@ -405,7 +405,7 @@ void parse_primary(Lexer *lexer, Ops *ops)
 
     if(match(lexer, TOK_LPAREN))
     {
-        Token *lparen = lexer->last_tok;
+        const Token *lparen = lexer->last_tok;
         parse_or(lexer, ops);
         if(!match(lexer, TOK_RPAREN))
         {
@@ -575,9 +575,11 @@ void load_tasks(Tasks *tasks)
     struct dirent *dir_entry;
     while((dir_entry = readdir(dir)) != NULL)
     {
+        if (strcmp(dir_entry->d_name, ".") == 0 || strcmp(dir_entry->d_name, "..") == 0) continue;
+
         assert(dir_entry->d_type == DT_DIR, 
                 "ERROR: malformed 'tasks' folder. Please remove './tasks/%s!\n", dir_entry->d_name);
-        StringView id = sv_from_cstr(dir_entry->d_name);
+        const StringView id = sv_from_cstr(dir_entry->d_name);
         const Task task = parse_task(id);
         da_append(tasks, task);
     }
@@ -586,14 +588,9 @@ void load_tasks(Tasks *tasks)
     assert(errno == 0, "ERROR: Could not properly read 'tasks' folder: %s\n", strerror(errno));
 }
 
-int task_cmp(const void *a, const void *b);
-
-void dump_tasks(void)
+void dump_tasks(const Tasks *tasks)
 {
-    Tasks tasks = {0};
-    load_tasks(&tasks);
-    da_sort(&tasks, task_cmp);
-    da_foreach(Task, task, &tasks)
+    da_foreach(Task, task, tasks)
     {
         printf("./tasks/"SV_FMT"/TASK.md: [PRIORITY: %ld", SV_ARG(task->id), task->prio);
         if(task->tags.count > 0) 
@@ -614,8 +611,10 @@ void print_usage(const char *program)
     printf("USAGE: %s <flags>\n", program);
     printf("    -h, --help:      print help\n");
     printf("    -n, --new:       create a new task\n");
-    printf("    -d, --date:      sort by creation date\n");
-    printf("    -p, --priority:  sort by priority (default)\n");
+    printf("    -d, --date:      sort by creation date (descending)\n");
+    printf("    -D, --Date:      sort by creation date (ascending)\n");
+    printf("    -p, --priority:  sort by priority (descending, default)\n");
+    printf("    -P, --Priority:  sort by priority (ascending)\n");
     printf("    -f, --filter:    filter existing tasks\n");
     printf("        syntax: '.<tag>', 'and', 'or', 'not', 'tagged', untagged, '(' and ')'\n");
     printf("        example: -f \".bug or untagged\"\n");
@@ -660,9 +659,12 @@ int task_cmp(const void *a, const void *b)
 int main(int argc, char **argv)
 {
     const char *program = shift_args(argc, argv);
+    Tasks tasks = {0};
+    load_tasks(&tasks);
+
     if(argc <= 0)
     {
-        dump_tasks();
+        dump_tasks(&tasks);
         return 0;
     }
 
@@ -673,7 +675,7 @@ int main(int argc, char **argv)
         {
             char timestamp[128];
             current_timestamp(timestamp, sizeof timestamp);
-            puts(timestamp);
+            
         }
         else if(0 == strcmp("-f", flag) || 0 == strcmp("--filter", flag))
         {
@@ -682,23 +684,16 @@ int main(int argc, char **argv)
             Lexer *lexer = lexer_new(filter);
             Ops ops = {0};
             parse_expr(lexer, &ops);
-            da_foreach(Op*, op, &ops)
-            {
-                printf("%s", op_to_str(*op));
-                if((*op)->code == OP_TAG) printf(": %s", (*op)->lexeme);
-                puts("");
-            }
+            // TODO: filter tasks function
         }
         else if(0 == strcasecmp("-d", flag) || 0 == strcasecmp("--date", flag))
         {
             if (flag[1] == 'D') sort_options.desc = false;
             sort_options.target = SORT_TIMESTAMP;
-            dump_tasks();
         }
         else if(0 == strcasecmp("-p", flag) || 0 == strcasecmp("--priority", flag))
         {
             if (flag[1] == 'P') sort_options.desc = false;
-            dump_tasks();
         }
         else if(0 == strcmp("-h", flag) || 0 == strcmp("--help", flag))
         {
@@ -710,6 +705,9 @@ int main(int argc, char **argv)
             print_usage(program);
         }
     }
+
+    da_sort(&tasks, task_cmp);
+    dump_tasks(&tasks);
 
     return 0;
 }
