@@ -122,26 +122,28 @@ Token* lexer_next_tok(Lexer *lexer)
     switch(lexer->cur_char)
     {
         case '(': {
+            tok = token_new(TOK_LPAREN, "(", lexer->pos);
             lexer_advance(lexer);
-            tok = token_new(TOK_LPAREN, "(", lexer->pos); break;
-        }
+        } break;
         case ')': {
+            tok = token_new(TOK_RPAREN, ")", lexer->pos);
             lexer_advance(lexer);
-            tok = token_new(TOK_RPAREN, ")", lexer->pos); break;
-        }
+        } break;
         case '!': {
-            lexer_advance(lexer);
             tok = token_new(TOK_NOT, "!", lexer->pos);
+            lexer_advance(lexer);
         }  break;
         case '&': {
-            lexer_advance(lexer);
+            const size_t pos = lexer->pos;
             lexer_match_char(lexer, '&');
-            tok = token_new(TOK_AND, "&&", lexer->pos);
+            tok = token_new(TOK_AND, "&&", pos);
+            lexer_advance(lexer);
         } break;
         case '|': {
-            lexer_advance(lexer);
+            const size_t pos = lexer->pos;
             lexer_match_char(lexer, '|');
-            tok = token_new(TOK_OR, "||", lexer->pos);
+            tok = token_new(TOK_OR, "||", pos);
+            lexer_advance(lexer);
         } break;
         default : {
             if(lexer->cur_char == '.' || isalpha(lexer->cur_char))
@@ -258,8 +260,8 @@ void parse_primary(Lexer *lexer, Ops *ops)
         {
             fprintf(stderr, "ERROR: non matching parenthesis!\n");
             fprintf(stderr, "\"%s\"\n", lexer->input);
-            const size_t caret1 = lparen->pos - 1;
-            const size_t caret2 = lexer->last_tok->pos - caret1 - 1;
+            const size_t caret1 = lparen->pos;
+            const size_t caret2 = lexer->last_tok->pos - caret1;
             fprintf(stderr, "%*s^%*s^\n", (int) caret1, "", (int) caret2, "");
             exit(1);
         }
@@ -312,6 +314,12 @@ void parse_or(Lexer *lexer, Ops *ops)
 void parse_expr(Lexer *lexer, Ops *ops)
 {
     parse_or(lexer, ops);
+     if (lexer->cur_tok != NULL) {
+        fprintf(stderr, "ERROR: unexpected token '%s' at end of expression\n", lexer->cur_tok->lexeme);
+        fprintf(stderr, "\"%s\"\n", lexer->input);
+        fprintf(stderr, "%*s^\n", (int) lexer->last_tok->pos, "");
+        exit(1);
+    }
 }
 
 int main(int argc, char **argv)
