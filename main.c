@@ -790,9 +790,9 @@ int task_cmp(const void *a, const void *b)
         case SORT_PRIO: {
             if (sort_options.desc)
             {
-                return (task_a->prio > task_b->prio) - (task_b->prio < task_a->prio);
+                return (task_b->prio > task_a->prio) - (task_b->prio < task_a->prio);
             }
-            return (task_a->prio < task_b->prio) - (task_b->prio > task_a->prio);
+            return (task_a->prio > task_b->prio) - (task_a->prio < task_b->prio);
         } break;
         case SORT_TIMESTAMP: {
             char *a_timestamp = cstr_from_sv(task_a->id);
