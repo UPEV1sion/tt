@@ -111,6 +111,12 @@ typedef struct {
 } Ops;
 
 typedef struct {
+    size_t count;
+    size_t capacity;
+    bool *items;
+} Stack;
+
+typedef struct {
     size_t pos;
     const char *input;
     Token *cur_tok;
@@ -155,7 +161,14 @@ typedef struct {
     } while(0)
 
 #define da_foreach(type, name, da) for(type *name = (da)->items; name < (da)->items + (da)->count; ++name)
+
 #define da_sort(da, cmp) qsort((da)->items, (da)->count, sizeof(*(da)->items), cmp)
+
+#define da_remove_unordered(da, idx) \
+    do { \
+        assert(idx < (da)->count, "ERROR: index out of bound!\n"); \
+        (da)->items[idx] = (da)->items[--(da)->count];  \
+    } while(0)
 
 StringView sv_from_sb(const StringBuilder *sb)
 {
@@ -167,15 +180,26 @@ StringView sv_from_sb(const StringBuilder *sb)
 
 StringView sv_chop(StringView *sv, const int delim)
 {
-    if(sv->len == 0) return (StringView) {NULL, 0};
+    if(sv->len == 0) return (StringView){NULL, 0};
 
     size_t i;
-    for(i = 0; i < sv->len && sv->s[i] != (unsigned char) delim; ++i)
-        ;
+    for(i = 0; i < sv->len; ++i) {
+        if((unsigned char)sv->s[i] == (unsigned char)delim)
+            break;
+    }
 
-    const StringView ret = {sv->s, i}; 
-    sv->s += i;
-    sv->len -= i;
+    const StringView ret = {sv->s, i};
+
+    if(i < sv->len)
+    {
+        sv->s += i + 1;
+        sv->len -= i + 1;
+    }
+    else
+    {
+        sv->s += i;
+        sv->len = 0;
+    }
 
     return ret;
 }
@@ -201,7 +225,7 @@ StringView sv_trim(StringView sv)
         sv.len--;
     }
 
-    while(sv.len > 0 && isspace((unsigned char) sv.s[sv.len]))
+    while(sv.len > 0 && isspace((unsigned char) sv.s[sv.len - 1]))
     {
         sv.len--;
     }
@@ -482,7 +506,9 @@ int read_file(StringBuilder *sb, const char *path)
     fseek(f, 0, SEEK_SET);
 
     da_reserve(sb, sb->count + size);
-    fread(sb->items + sb->count, size, 1, f);
+    fread(sb->items + sb->count, 1, size, f);
+    sb->count += size;
+    // TODO make more robust
     assert(ferror(f) == 0, "ERROR: Could not read file %s\n", path);
     fclose(f);
 
@@ -509,16 +535,23 @@ Task parse_task(const StringView id)
     {
         if(sv_is_prefix(meta, "- PRIORITY"))
         {
-            StringView prio = sv_chop(&meta, ':');
-            prio = sv_trim(prio);
-            char *prio_str = cstr_from_sv(prio);
+            sv_chop(&meta, ':');
+            char prio_buf[BUFSIZE];
+            size_t read = 0;
+            size_t write = 0;
+            const size_t len = meta.len < BUFSIZE ? meta.len : BUFSIZE;
+            while (isspace(meta.s[read])) read++;
+            while (write < len - 1 && isdigit(meta.s[read]))
+            {
+                prio_buf[write++] = meta.s[read++];
+            }
+            prio_buf[write] = 0;
 
             char *endptr;
-            const long num = strtol(prio_str, &endptr, 10);
-            assert(*endptr == 0, "ERROR: count not parse priority: %s\n", prio_str);
+            const long num = strtol(prio_buf, &endptr, 10);
+            assert(*endptr == 0, "ERROR: count not parse priority: %s\n", prio_buf);
 
             task.prio = num;
-            free(prio_str);
         }
         else if(sv_is_prefix(meta, "- STATUS"))
         {
@@ -555,7 +588,7 @@ Task parse_task(const StringView id)
     return task;
 }
 
-void load_tasks(Tasks *tasks)
+void create_task_folder(void)
 {
     DIR *dir = opendir("./tasks");
     if(dir == NULL)
@@ -570,7 +603,15 @@ void load_tasks(Tasks *tasks)
 
         return;
     }
+    closedir(dir);
+}
 
+void load_tasks(Tasks *tasks)
+{
+    create_task_folder();
+
+    DIR *dir = opendir("./tasks");
+    if(dir == NULL)
     errno = 0;
     struct dirent *dir_entry;
     while((dir_entry = readdir(dir)) != NULL)
@@ -588,6 +629,74 @@ void load_tasks(Tasks *tasks)
     assert(errno == 0, "ERROR: Could not properly read 'tasks' folder: %s\n", strerror(errno));
 }
 
+bool task_contains_tag(Task task, const char *tag)
+{
+    da_foreach(StringView, sv, &task.tags)
+    {
+        char *cur_tag = cstr_from_sv(*sv);
+        if(0 == strcmp(cur_tag, tag)) 
+        {
+            free(cur_tag);
+            return true;
+        }
+        free(cur_tag);
+    }
+    
+    return false;
+}
+
+bool task_matches_filter(const Task task, const Ops *ops, Stack *stack)
+{
+    da_foreach(Op *, op, ops)
+    {
+        switch((*op)->code)
+        {
+            case OP_AND: {
+                const bool a = stack->items[stack->count - 1];
+                const bool b = stack->items[stack->count - 2];
+                stack->count -= 2;
+                da_append(stack, a && b);
+            } break;
+            case OP_OR: {
+                const bool a = stack->items[stack->count - 1];
+                const bool b = stack->items[stack->count - 2];
+                stack->count -= 2;
+                da_append(stack, a || b);
+            } break;
+            case OP_NOT: {
+                stack->items[stack->count - 1] = !stack->items[stack->count - 1];
+            } break;
+            case OP_TAG: {
+                const bool a = task_contains_tag(task, (*op)->lexeme);
+                da_append(stack, a);
+            } break;
+            case OP_TAGGED: {
+                da_append(stack, task.tags.count > 0);
+            } break;
+            case OP_UNTAGGED: {
+                da_append(stack, task.tags.count == 0);
+            } break;
+            case OP_ID: assert(false, "TODO");
+            default: assert(false, "UNREACHABLE\n");
+        }
+    }
+
+    return *stack->items;
+}
+
+void filter_tasks(Tasks *tasks, const Ops *ops)
+{
+    Stack stack = {0};
+    for(size_t i = tasks->count; i > 0; --i)
+    {
+        stack.count = 0;
+        if(!task_matches_filter(tasks->items[i - 1], ops, &stack))
+        {
+            da_remove_unordered(tasks, i - 1);
+        }
+    }
+}
+
 void dump_tasks(const Tasks *tasks)
 {
     da_foreach(Task, task, tasks)
@@ -602,8 +711,57 @@ void dump_tasks(const Tasks *tasks)
                 printf(", "SV_FMT, SV_ARG(task->tags.items[i]));
             } 
         }
-        printf("] "SV_FMT"\n", SV_ARG(task->title));
+        assert(task->title.len >= 2, "ERROR: malformed title\""SV_FMT"\"\n", SV_ARG(task->title));
+        const StringView tmp_title = {.s = task->title.s + 2, .len = task->title.len - 2};
+        printf("] "SV_FMT"\n", SV_ARG(tmp_title));
     }
+}
+
+void create_new_task(void)
+{
+    char timestamp[128];
+    current_timestamp(timestamp, sizeof timestamp);
+    printf("INFO: Creating \"./tasks/%s/TASK.md\"\n", timestamp);
+    printf("INFO: Please provide the following information\n");
+
+    char title[BUFSIZE];
+    printf("Title: ");
+    fgets(title, sizeof title, stdin);
+
+    char status[BUFSIZE];
+    printf("Status: ");
+    fgets(status, sizeof status, stdin);
+
+    long prio = 0;
+    printf("Priority (0-100): ");
+    scanf("%ld", &prio);
+    getchar();
+
+    char tags[BUFSIZE];
+    printf("Tags (optional, comma separated): ");
+    fgets(tags, sizeof tags, stdin);
+
+    create_task_folder();
+    char path[BUFSIZE];
+    int offset = snprintf(path, BUFSIZE, "./tasks/%s/", timestamp);
+    if(mkdir(path, 0755) != 0)
+    {
+        fprintf(stderr, "ERROR: Could not create \"%s\" folder: %s\n", path, strerror(errno));
+        exit(1);
+    }
+    
+    snprintf(path + offset, BUFSIZE - offset, "TASK.md"); 
+    FILE *fp;
+    assert((fp = fopen(path, "w")) != NULL, "ERROR: Could not open \"%s\" for writing\n", path);
+
+    fprintf(fp, "# %s\n", title);
+    fprintf(fp, "- STATUS: %s", status);
+    fprintf(fp, "- PRIORITY: %ld\n", prio);
+    if(tags[0] != '\n') fprintf(fp, "- TAGS: %s", tags);
+
+    fclose(fp);
+
+    printf("INFO: Wrote \"%s\"\n", path);
 }
 
 void print_usage(const char *program)
@@ -673,9 +831,8 @@ int main(int argc, char **argv)
         const char *flag = shift_args(argc, argv);
         if(0 == strcmp("-n", flag) || 0 == strcmp("--new", flag))
         {
-            char timestamp[128];
-            current_timestamp(timestamp, sizeof timestamp);
-            
+            create_new_task();
+            return 0;
         }
         else if(0 == strcmp("-f", flag) || 0 == strcmp("--filter", flag))
         {
