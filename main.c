@@ -629,12 +629,12 @@ void load_tasks(Tasks *tasks)
     assert(errno == 0, "ERROR: Could not properly read 'tasks' folder: %s\n", strerror(errno));
 }
 
-bool task_contains_tag(Task task, const char *tag)
+bool task_contains_tag(const Task task, const char *tag)
 {
     da_foreach(StringView, sv, &task.tags)
     {
         char *cur_tag = cstr_from_sv(*sv);
-        if(0 == strcmp(cur_tag, tag)) 
+        if(0 == strcmp(cur_tag, tag + 1)) // TODO this is a bit hacky...
         {
             free(cur_tag);
             return true;
@@ -841,7 +841,7 @@ int main(int argc, char **argv)
             Lexer *lexer = lexer_new(filter);
             Ops ops = {0};
             parse_expr(lexer, &ops);
-            // TODO: filter tasks function
+            filter_tasks(&tasks, &ops);
         }
         else if(0 == strcasecmp("-d", flag) || 0 == strcasecmp("--date", flag))
         {
@@ -868,4 +868,3 @@ int main(int argc, char **argv)
 
     return 0;
 }
-
