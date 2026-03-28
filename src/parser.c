@@ -276,9 +276,9 @@ void parse_expr(Lexer *lexer, Ops *ops)
 {
     parse_or(lexer, ops);
      if (lexer->cur_tok != NULL) {
-        fprintf(stderr, "ERROR: unexpected token '%s' at end of expression\n", lexer->cur_tok->lexeme);
+        fprintf(stderr, "ERROR: unexpected token \"%s\" at end of expression\n", lexer->cur_tok->lexeme);
         fprintf(stderr, "\"%s\"\n", lexer->input);
-        fprintf(stderr, "%*s^\n", (int) lexer->last_tok->pos, "");
+        fprintf(stderr, "%*s^\n", (int) lexer->last_tok->pos + 1, "");
         exit(1);
     }
 }
