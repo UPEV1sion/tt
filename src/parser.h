@@ -5,6 +5,8 @@
 #ifndef PARSER_H_
 #define PARSER_H_
 
+#include <stddef.h>
+
 #define OP_LIST\
     X(OP_AND) \
     X(OP_OR) \

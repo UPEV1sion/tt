@@ -1,5 +1,5 @@
 CC := gcc
 CFLAGS := -Wall -Wextra -pedantic -O2
 
-tt: main.c parser.c
+tt: src/main.c src/parser.c
 	$(CC) $(CFLAGS) $^ -o $@
