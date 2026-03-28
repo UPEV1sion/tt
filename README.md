@@ -23,6 +23,6 @@ This utility provides facilities to create, sort tasks and filter tasks:
     -P, --Priority:  sort by priority (ascending)
     -f, --filter:    filter existing tasks
         syntax: '.<tag>', 'and', 'or', 'not', 'tagged', untagged, '(' and ')'
-        example: -f \".bug or untagged\"
-        example: -f \".unfinished and not (.feature or .refactor)\"
+        example: -f ".bug or untagged"
+        example: -f ".unfinished and not (.feature or .refactor)"
 ``` 
