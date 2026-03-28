@@ -196,23 +196,26 @@ bool task_contains_tag(const Task task, const char *tag)
 
 bool task_matches_filter(const Task task, const Ops *ops, Stack *stack)
 {
-    da_foreach(Op , op, ops)
+    da_foreach(Op, op, ops)
     {
         switch(op->code)
         {
             case OP_AND: {
+                assert(stack->count >= 2, "ERROR: stack underflow\n");
                 const bool a = stack->items[stack->count - 1];
                 const bool b = stack->items[stack->count - 2];
                 stack->count -= 2;
                 da_append(stack, a && b);
             } break;
             case OP_OR: {
+                assert(stack->count >= 2, "ERROR: stack underflow\n");
                 const bool a = stack->items[stack->count - 1];
                 const bool b = stack->items[stack->count - 2];
                 stack->count -= 2;
                 da_append(stack, a || b);
             } break;
             case OP_NOT: {
+                assert(stack->count >= 1, "ERROR: stack underflow\n");
                 stack->items[stack->count - 1] = !stack->items[stack->count - 1];
             } break;
             case OP_TAG: {
@@ -230,6 +233,7 @@ bool task_matches_filter(const Task task, const Ops *ops, Stack *stack)
         }
     }
 
+    assert(stack->count == 1, "ERROR: invalid filter evaluation\n");
     return *stack->items;
 }
 
@@ -404,6 +408,7 @@ int main(int argc, char **argv)
         {
             fprintf(stderr, "ERROR: Invalid flag \"%s\"\n", flag);
             print_usage(program);
+            return 1;
         }
     }
 

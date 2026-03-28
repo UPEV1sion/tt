@@ -2,6 +2,9 @@
 
 !*.c
 !*.h
+!*.md
 !LICENSE
 !Makefile
 !.gitignore
+!tasks/
+!tasks/**
