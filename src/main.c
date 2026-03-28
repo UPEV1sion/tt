@@ -150,6 +150,7 @@ void create_task_folder(void)
             exit(1);
         }
 
+        errno = 0;
         return;
     }
     closedir(dir);
@@ -174,7 +175,7 @@ void load_tasks(Tasks *tasks)
         da_append(tasks, task);
     }
 
-    assert(closedir(dir) == 0, "ERROR: Could not close 'tasks' folder: %s\n", strerror(errno));    
+    assert(closedir(dir) == 0, "ERROR: Could not close 'tasks' folder: %s\n", strerror(errno));
     assert(errno == 0, "ERROR: Could not properly read 'tasks' folder: %s\n", strerror(errno));
 }
 
