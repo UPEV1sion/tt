@@ -184,7 +184,7 @@ bool task_contains_tag(const Task task, const char *tag)
     da_foreach(StringView, sv, &task.tags)
     {
         char *cur_tag = cstr_from_sv(*sv);
-        if(0 == strcmp(cur_tag, tag + 1)) // TODO this is a bit hacky...
+        if(0 == strcmp(cur_tag, tag)) 
         {
             free(cur_tag);
             return true;
@@ -229,8 +229,8 @@ bool task_matches_filter(const Task task, const Ops *ops, Stack *stack)
             case OP_UNTAGGED: {
                 da_append(stack, task.tags.count == 0);
             } break;
-            case OP_ID: assert(false, "TODO");
-            default: assert(false, "UNREACHABLE\n");
+            case OP_ID: assert(false, "TODO"); break;
+            default: assert(false, "UNREACHABLE\n"); break;
         }
     }
 
