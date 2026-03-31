@@ -200,7 +200,7 @@ void load_tasks(Tasks *tasks)
     struct dirent *dir_entry;
     while((dir_entry = readdir(dir)) != NULL)
     {
-        if (strcmp(dir_entry->d_name, ".") == 0 || strcmp(dir_entry->d_name, "..") == 0) continue;
+        if (0 == strcmp(dir_entry->d_name, ".") || 0 == strcmp(dir_entry->d_name, "..")) continue;
 
         assertmsg(dir_entry->d_type == DT_DIR, 
                 "ERROR: malformed \"tasks\" folder. Please remove \"./tasks/%s\"!\n", dir_entry->d_name);
@@ -400,20 +400,14 @@ int task_cmp(const void *a, const void *b)
             return (task_a->prio > task_b->prio) - (task_a->prio < task_b->prio);
         } break;
         case SORT_TIMESTAMP: {
-            char *a_timestamp = cstr_from_sv(task_a->id);
-            char *b_timestamp = cstr_from_sv(task_b->id);
-            int ret = 0;
             if (sort_options.desc)
             {
-                ret = strcmp(a_timestamp, b_timestamp);
+                return sv_cmp(task_a->id, task_b->id);
             }
             else
             {
-                ret = strcmp(b_timestamp, a_timestamp);
+                return sv_cmp(task_b->id, task_a->id);
             }
-            free(a_timestamp);
-            free(b_timestamp);
-            return ret;
         } break;
         default: assertmsg(false, "UNREACHABLE");
     }
@@ -444,14 +438,25 @@ int main(int argc, char **argv)
             parse_expr(lexer, &ops);
             filter_tasks(&tasks, &ops);
         }
-        else if(0 == strcasecmp("-d", flag) || 0 == strcasecmp("--date", flag))
+        else if(0 == strcmp("-d", flag) || 0 == strcmp("--date", flag))
         {
-            if (flag[1] == 'D') sort_options.desc = false;
+            sort_options.desc = true;
             sort_options.target = SORT_TIMESTAMP;
         }
-        else if(0 == strcasecmp("-p", flag) || 0 == strcasecmp("--priority", flag))
+        else if(0 == strcmp("-D", flag) || 0 == strcmp("--Date", flag))
         {
-            if (flag[1] == 'P') sort_options.desc = false;
+            sort_options.desc = false;
+            sort_options.target = SORT_TIMESTAMP;
+        }
+        else if(0 == strcmp("-p", flag) || 0 == strcmp("--priority", flag))
+        {
+            sort_options.desc = true;
+            sort_options.target = SORT_PRIO;
+        }
+        else if(0 == strcmp("-P", flag) || 0 == strcmp("--Priority", flag))
+        {
+            sort_options.desc = false;
+            sort_options.target = SORT_PRIO;
         }
         else if(0 == strcmp("-h", flag) || 0 == strcmp("--help", flag))
         {

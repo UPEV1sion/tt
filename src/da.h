@@ -68,6 +68,7 @@ typedef struct {
 DA_DEF StringView sv_from_sb(const StringBuilder *sb);
 DA_DEF StringView sv_chop(StringView *sv, int delim);
 DA_DEF bool sv_equal(StringView sv1, StringView sv2);
+DA_DEF int sv_cmp(StringView sv1, StringView sv2);
 DA_DEF bool sv_is_prefix(StringView sv, const char *prefix);
 DA_DEF StringView sv_trim(StringView sv);
 DA_DEF char* cstr_from_sv(StringView sv);
@@ -113,16 +114,20 @@ StringView sv_chop(StringView *sv, const int delim)
 
 DA_DEF bool sv_equal(StringView sv1, StringView sv2)
 {
-    if(sv1.len != sv2.len) return false;
-
-    for(size_t i = 0; i < sv1.len; ++i)
-    {
-        if(sv1.s[i] != sv2.s[i]) return false;
-    }
-
-    return true;
+    return sv_cmp(sv1, sv2) == 0;
 }
 
+DA_DEF int sv_cmp(StringView sv1, StringView sv2)
+{
+    const size_t min_len = sv1.len < sv2.len ? sv1.len : sv2.len;
+
+    const int cmp = memcmp(sv1.s, sv2.s, min_len);
+    if (cmp != 0) return cmp;
+
+    if (sv1.len < sv2.len) return -1;
+    if (sv1.len > sv2.len) return 1;
+    return 0;
+}
 
 bool sv_is_prefix(const StringView sv, const char *prefix)
 {
