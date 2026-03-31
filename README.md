@@ -30,7 +30,7 @@ This utility provides facilities to create, sort tasks and filter tasks:
 
 ### Filter syntax
 
-You can filter task using a simple query language:
+You can filter tasks using a simple query language:
 - Tags must be prefixed with a `.` (e.g. `.bug`)
 - Supported operators: `and`, `or`, `not`, `(` and `)`
 - Keywords:
@@ -64,7 +64,7 @@ Tasks are sorted by priority (descending) by default.
 
 _TAGS_
 
-- Free-from values defined by the user
+- Free-form values defined by the user
 - Must be prefixed with `.`with filtering
 - Used with the `-f` option for querying tasks
 
