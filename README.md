@@ -69,3 +69,40 @@ _TAGS_
 - Used with the `-f` option for querying tasks
 
 
+After that a markdown file will be created in a folder with a timestamp (e.g. `tasks/20260328-085723/TASK.md`) with the exemplary preamble:
+```markdown
+# Verbose output
+
+- STATUS: OPEN
+- PRIORITY: 20
+- TAGS: feature, cli
+```
+
+The user can add arbitrary files into the created folder and write additional information _after_ the preamble.
+For example:
+```markdown
+# Verbose output
+
+- STATUS: OPEN
+- PRIORITY: 20
+- TAGS: feature, cli
+
+Add support for verbose output (-v, --verbose), to print the content of each task.
+
+```console
+$ ./tt -v
+./tasks/20260328-085723/TASK.md: [PRIORITY: 20, TAGS: feature, cli] Verbose output
+> # Verbose output
+> 
+> - STATUS: OPEN
+> - PRIORITY: 20
+> - TAGS: feature, cli
+> 
+> Add support for verbose output (-v, --verbose), to print the content of each task.
+```
+```
+
+
+
+
+
