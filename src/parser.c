@@ -52,7 +52,7 @@ struct Lexer {
 Token* token_new(const TokenType type, const char *lexeme, const size_t pos)
 {
     Token *tok = malloc(sizeof(Token));
-    assert(tok != NULL, "ERROR: Count not create token!\n");
+    assertmsg(tok != NULL, "ERROR: Count not create token!\n");
     tok->type = type;
     tok->lexeme = strdup(lexeme);
     tok->pos = pos;
@@ -75,7 +75,7 @@ void lexer_trim_left(Lexer *lexer)
 
 void lexer_match_char(Lexer *lexer, const int c)
 {
-    assert(lexer->cur_char == c, "ERROR: unexpected char '%c'\n", c);
+    assertmsg(lexer->cur_char == c, "ERROR: unexpected char '%c'\n", c);
     lexer_advance(lexer);
 }
 
@@ -149,9 +149,9 @@ end:
 Lexer *lexer_new(const char *source_code)
 {
     Lexer *lexer = calloc(1, sizeof(Lexer));
-    assert(lexer != NULL, "ERROR: Could not allocate lexer\n");
+    assertmsg(lexer != NULL, "ERROR: Could not allocate lexer\n");
     lexer->input = strdup(source_code);
-    assert(lexer->input != NULL, "Could not allocate source string\n");
+    assertmsg(lexer->input != NULL, "Could not allocate source string\n");
     lexer_advance(lexer);
     lexer_next_tok(lexer);
 

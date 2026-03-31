@@ -6,7 +6,7 @@
 #define COMMON_H_
 
 #define ARRAY_LEN(a)(sizeof(a)/sizeof(a[0]))
-#define assert(cond, ...) \
+#define assertmsg(cond, ...) \
     do { \
         if(!(cond)) \
         { \

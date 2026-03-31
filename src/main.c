@@ -8,6 +8,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <dirent.h>
+#include <assert.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <sys/stat.h>
@@ -25,10 +26,17 @@ typedef struct {
     StringView *items;
 } Tags;
 
+typedef enum {
+    OPEN,
+    IN_PROGRESS,
+    CLOSED,
+    status_count_,
+} TaskStatus;
+
 typedef struct {
     StringView id;
     StringView title;
-    StringView status;
+    TaskStatus status;
     long prio;
     Tags tags;
 } Task;
@@ -58,10 +66,10 @@ typedef struct {
 void current_timestamp(char *buffer, const size_t buffer_size)
 {
     const time_t t = time(NULL);
-    assert(t > -1, "Could not get time: %s\n", strerror(errno));
+    assertmsg(t > -1, "Could not get time: %s\n", strerror(errno));
     const struct tm *lt = localtime(&t);
-    assert(lt != NULL, "Could not get localtime: %s\n", strerror(errno));
-    assert(strftime(buffer, buffer_size, "%Y%m%d-%H%M%S", lt) > 0, "ERROR: could not format time!\n");
+    assertmsg(lt != NULL, "Could not get localtime: %s\n", strerror(errno));
+    assertmsg(strftime(buffer, buffer_size, "%Y%m%d-%H%M%S", lt) > 0, "ERROR: could not format time!\n");
 }
 
 Task parse_task(const StringView id)
@@ -98,13 +106,39 @@ Task parse_task(const StringView id)
 
             char *endptr;
             const long num = strtol(prio_buf, &endptr, 10);
-            assert(*endptr == 0, "ERROR: count not parse priority: %s\n", prio_buf);
+            assertmsg(*endptr == 0, "ERROR: count not parse priority: %s\n", prio_buf);
 
             task.prio = num;
         }
         else if(sv_is_prefix(meta, "- STATUS"))
         {
-            task.status = meta;
+            sv_chop(&meta, ':');
+            const StringView trimmed = sv_trim(meta);
+            if(trimmed.len == 0)
+            {
+                fprintf(stderr, "ERROR: Malformed \"STATUS\" header in %s\n", path);
+                exit(1); 
+            }
+
+            static_assert(status_count_ == 3, "ERROR: non exhausive handling of STATUSES");
+            if(sv_equal(trimmed, sv_from_cstr("OPEN")))
+            {
+                task.status = OPEN;
+            }
+            else if(sv_equal(trimmed, sv_from_cstr("IN_PROGRESS")))
+            {
+                task.status = IN_PROGRESS;
+            }
+            else if(sv_equal(trimmed, sv_from_cstr("CLOSED")))
+            {
+                task.status = CLOSED;
+            }
+            else
+            {
+                fprintf(stderr, "ERROR: Malfromed \"STATUS\" header in %s\n", path);
+                fprintf(stderr, "ERROR: Available options: \"OPEN\", \"IN_PROGRESS\", \"CLOSED\"\n");
+                exit(1);
+            }
         }
         else if(sv_is_prefix(meta, "- TAGS"))
         {
@@ -112,7 +146,7 @@ Task parse_task(const StringView id)
             StringView trimmed = sv_trim(meta); 
             if(trimmed.len == 0)
             {
-                fprintf(stderr, "ERROR: Malformed 'TAGS' header in %s\n", path);
+                fprintf(stderr, "ERROR: Malformed \"TAGS\" header in %s\n", path);
                 exit(1);
             }
 
@@ -168,15 +202,15 @@ void load_tasks(Tasks *tasks)
     {
         if (strcmp(dir_entry->d_name, ".") == 0 || strcmp(dir_entry->d_name, "..") == 0) continue;
 
-        assert(dir_entry->d_type == DT_DIR, 
-                "ERROR: malformed 'tasks' folder. Please remove './tasks/%s!\n", dir_entry->d_name);
+        assertmsg(dir_entry->d_type == DT_DIR, 
+                "ERROR: malformed \"tasks\" folder. Please remove \"./tasks/%s\"!\n", dir_entry->d_name);
         const StringView id = sv_from_cstr(dir_entry->d_name);
         const Task task = parse_task(id);
-        da_append(tasks, task);
+        if(task.status != CLOSED) da_append(tasks, task);
     }
 
-    assert(closedir(dir) == 0, "ERROR: Could not close 'tasks' folder: %s\n", strerror(errno));
-    assert(errno == 0, "ERROR: Could not properly read 'tasks' folder: %s\n", strerror(errno));
+    assertmsg(closedir(dir) == 0, "ERROR: Could not close \"tasks\" folder: %s\n", strerror(errno));
+    assertmsg(errno == 0, "ERROR: Could not properly read \"tasks\" folder: %s\n", strerror(errno));
 }
 
 bool task_contains_tag(const Task task, const char *tag)
@@ -202,21 +236,21 @@ bool task_matches_filter(const Task task, const Ops *ops, Stack *stack)
         switch(op->code)
         {
             case OP_AND: {
-                assert(stack->count >= 2, "ERROR: stack underflow\n");
+                assertmsg(stack->count >= 2, "ERROR: stack underflow\n");
                 const bool a = stack->items[stack->count - 1];
                 const bool b = stack->items[stack->count - 2];
                 stack->count -= 2;
                 da_append(stack, a && b);
             } break;
             case OP_OR: {
-                assert(stack->count >= 2, "ERROR: stack underflow\n");
+                assertmsg(stack->count >= 2, "ERROR: stack underflow\n");
                 const bool a = stack->items[stack->count - 1];
                 const bool b = stack->items[stack->count - 2];
                 stack->count -= 2;
                 da_append(stack, a || b);
             } break;
             case OP_NOT: {
-                assert(stack->count >= 1, "ERROR: stack underflow\n");
+                assertmsg(stack->count >= 1, "ERROR: stack underflow\n");
                 stack->items[stack->count - 1] = !stack->items[stack->count - 1];
             } break;
             case OP_TAG: {
@@ -229,12 +263,12 @@ bool task_matches_filter(const Task task, const Ops *ops, Stack *stack)
             case OP_UNTAGGED: {
                 da_append(stack, task.tags.count == 0);
             } break;
-            case OP_ID: assert(false, "TODO"); break;
-            default: assert(false, "UNREACHABLE\n"); break;
+            case OP_ID: assertmsg(false, "TODO"); break;
+            default: assertmsg(false, "UNREACHABLE\n"); break;
         }
     }
 
-    assert(stack->count == 1, "ERROR: invalid filter evaluation\n");
+    assertmsg(stack->count == 1, "ERROR: invalid filter evaluation\n");
     return *stack->items;
 }
 
@@ -265,7 +299,7 @@ void dump_tasks(const Tasks *tasks)
                 printf(", "SV_FMT, SV_ARG(task->tags.items[i]));
             } 
         }
-        assert(task->title.len >= 2, "ERROR: malformed title\""SV_FMT"\"\n", SV_ARG(task->title));
+        assertmsg(task->title.len >= 2, "ERROR: malformed title\""SV_FMT"\"\n", SV_ARG(task->title));
         const StringView tmp_title = {.s = task->title.s + 2, .len = task->title.len - 2};
         printf("] "SV_FMT"\n", SV_ARG(tmp_title));
     }
@@ -280,20 +314,37 @@ void create_new_task(void)
 
     char title[BUFSIZE];
     printf("Title: ");
-    assert(fgets(title, sizeof title, stdin) != NULL, "ERROR: Could not read title");
+    assertmsg(fgets(title, sizeof title, stdin) != NULL, "ERROR: Could not read title\n");
+    title[strcspn(title, "\n")] = 0;
 
     char status[BUFSIZE];
-    printf("Status: ");
-    assert(fgets(status, sizeof status, stdin) != NULL, "ERROR: Could not read status");
+    static_assert(status_count_ == 3, "ERROR: non exhausive handling of status");
+    printf("Status (OPEN, IN_PROGRESS, CLOSED): ");
+    assertmsg(fgets(status, sizeof status, stdin) != NULL, "ERROR: Could not read status\n");
+    status[strcspn(status, "\n")] = 0;
+    char *states[] = {"OPEN", "IN_PROGRESS", "CLOSED"};
+    bool valid_state = false;
+    for(size_t i = 0; i < ARRAY_LEN(states); ++i)
+    {
+        valid_state = valid_state || (0 == strcmp(states[i], status));
+    }
+    if(!valid_state)
+    {
+        fprintf(stderr, "ERROR: invalid status \"%s\"\n", status);
+        fprintf(stderr, "ERROR: Available options: \"OPEN\", \"IN_PROGRESS\", \"CLOSED\"\n");
+        exit(1);
+    }
 
     long prio = 0;
     printf("Priority (0-100): ");
-    assert(scanf("%ld", &prio) == 1, "ERROR: Could not read priority");
+    assertmsg(scanf("%ld", &prio) == 1, "ERROR: Could not read priority\n");
+    assertmsg(prio >= 0 && prio <= 100, "ERROR: Invalid priority \"%ld\". Available range 0-100\n", prio);
     getchar();
 
     char tags[BUFSIZE];
     printf("Tags (optional, comma separated): ");
-    assert(fgets(tags, sizeof tags, stdin) != NULL, "ERROR: Could not read tags");
+    assertmsg(fgets(tags, sizeof tags, stdin) != NULL, "ERROR: Could not read tags\n");
+    tags[strcspn(tags, "\n")] = 0;
 
     create_task_folder();
     char path[BUFSIZE];
@@ -306,12 +357,12 @@ void create_new_task(void)
     
     snprintf(path + offset, BUFSIZE - offset, "TASK.md"); 
     FILE *fp;
-    assert((fp = fopen(path, "w")) != NULL, "ERROR: Could not open \"%s\" for writing\n", path);
+    assertmsg((fp = fopen(path, "w")) != NULL, "ERROR: Could not open \"%s\" for writing\n", path);
 
-    fprintf(fp, "# %s\n", title);
-    fprintf(fp, "- STATUS: %s", status);
+    fprintf(fp, "# %s\n\n", title);
+    fprintf(fp, "- STATUS: %s\n", status);
     fprintf(fp, "- PRIORITY: %ld\n", prio);
-    if(tags[0] != '\n') fprintf(fp, "- TAGS: %s", tags);
+    if(strlen(tags) > 0) fprintf(fp, "- TAGS: %s", tags);
 
     fclose(fp);
 
@@ -364,7 +415,7 @@ int task_cmp(const void *a, const void *b)
             free(b_timestamp);
             return ret;
         } break;
-        default: assert(false, "UNREACHABLE");
+        default: assertmsg(false, "UNREACHABLE");
     }
 }
 
@@ -387,7 +438,7 @@ int main(int argc, char **argv)
         else if(0 == strcmp("-f", flag) || 0 == strcmp("--filter", flag))
         {
             const char *filter = shift_args(argc, argv);
-            assert(argc >= 0, "ERROR: no filter provided!\n");
+            assertmsg(argc >= 0, "ERROR: no filter provided!\n");
             Lexer *lexer = lexer_new(filter);
             Ops ops = {0};
             parse_expr(lexer, &ops);

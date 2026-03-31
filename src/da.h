@@ -34,7 +34,7 @@ typedef struct {
             if((da)->capacity == 0) (da)->capacity = DA_INIT_CAP; \
             while((expected) > (da)->capacity) (da)->capacity *= DA_GROW_SIZE; \
             (da)->items = realloc((da)->items, (da)->capacity * sizeof(*(da)->items)); \
-            assert((da)->items, "ERROR: out of mem!\n"); \
+            assertmsg((da)->items, "ERROR: out of mem!\n"); \
         } \
     } while(0)
 
@@ -57,7 +57,7 @@ typedef struct {
 
 #define da_remove_unordered(da, idx) \
     do { \
-        assert(idx < (da)->count, "ERROR: index out of bound!\n"); \
+        assertmsg(idx < (da)->count, "ERROR: index out of bound!\n"); \
         (da)->items[idx] = (da)->items[--(da)->count];  \
     } while(0)
 
@@ -67,6 +67,7 @@ typedef struct {
 
 DA_DEF StringView sv_from_sb(const StringBuilder *sb);
 DA_DEF StringView sv_chop(StringView *sv, int delim);
+DA_DEF bool sv_equal(StringView sv1, StringView sv2);
 DA_DEF bool sv_is_prefix(StringView sv, const char *prefix);
 DA_DEF StringView sv_trim(StringView sv);
 DA_DEF char* cstr_from_sv(StringView sv);
@@ -110,6 +111,19 @@ StringView sv_chop(StringView *sv, const int delim)
     return ret;
 }
 
+DA_DEF bool sv_equal(StringView sv1, StringView sv2)
+{
+    if(sv1.len != sv2.len) return false;
+
+    for(size_t i = 0; i < sv1.len; ++i)
+    {
+        if(sv1.s[i] != sv2.s[i]) return false;
+    }
+
+    return true;
+}
+
+
 bool sv_is_prefix(const StringView sv, const char *prefix)
 {
     const size_t len = strlen(prefix);
@@ -142,7 +156,7 @@ StringView sv_trim(StringView sv)
 char* cstr_from_sv(const StringView sv)
 {
     char *str;
-    assert((str = malloc(sv.len + 1)) != NULL, "ERROR: Could not allocate cstr\n");
+    assertmsg((str = malloc(sv.len + 1)) != NULL, "ERROR: Could not allocate cstr\n");
     memcpy(str, sv.s, sv.len);
     str[sv.len] = 0;
     return str;
@@ -151,7 +165,7 @@ char* cstr_from_sv(const StringView sv)
 StringView sv_from_cstr(const char *s)
 {
     const char *dupped = strdup(s);
-    assert(dupped != NULL, "ERROR: Could not duplicate string\n");
+    assertmsg(dupped != NULL, "ERROR: Could not duplicate string\n");
     return (StringView) {
         .s = dupped,
         .len = strlen(dupped)
@@ -161,11 +175,11 @@ StringView sv_from_cstr(const char *s)
 int read_file(StringBuilder *sb, const char *path)
 {
     FILE *f = fopen(path, "rb");
-    assert(f != NULL, "ERROR: Could not open file %s\n", path);
-    assert(fseek(f, 0, SEEK_END) == 0, "ERROR: fseek failed for %s\n", path);
+    assertmsg(f != NULL, "ERROR: Could not open file %s\n", path);
+    assertmsg(fseek(f, 0, SEEK_END) == 0, "ERROR: fseek failed for %s\n", path);
     const long size = ftell(f);
-    assert(size >= 0, "ftell failed for %s\n", path);
-    assert(fseek(f, 0, SEEK_SET) == 0, "ERROR: fseek rewind failed for %s\n", path);
+    assertmsg(size >= 0, "ftell failed for %s\n", path);
+    assertmsg(fseek(f, 0, SEEK_SET) == 0, "ERROR: fseek rewind failed for %s\n", path);
     da_reserve(sb, sb->count + (size_t)size);
 
     size_t total_read = 0;
@@ -180,7 +194,7 @@ int read_file(StringBuilder *sb, const char *path)
 
         if (n == 0)
         {
-            assert(!ferror(f), "Read error in file %s\n", path);
+            assertmsg(!ferror(f), "Read error in file %s\n", path);
             break;
         }
 
