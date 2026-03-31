@@ -16,13 +16,56 @@ $ ./tt <flags>
 This utility provides facilities to create, sort tasks and filter tasks:
 ```console
     -h, --help:      print help
+
     -n, --new:       create a new task
+
     -d, --date:      sort by creation date (descending)
     -D, --Date:      sort by creation date (ascending)
+
     -p, --priority:  sort by priority (descending, default)
     -P, --Priority:  sort by priority (ascending)
+
     -f, --filter:    filter existing tasks
-        syntax: '.<tag>', 'and', 'or', 'not', 'tagged', untagged, '(' and ')'
-        example: -f ".bug or untagged"
-        example: -f ".unfinished and not (.feature or .refactor)"
 ``` 
+
+### Filter syntax
+
+You can filter task using a simple query language:
+- Tags must be prefixed with a `.` (e.g. `.bug`)
+- Supported operators: `and`, `or`, `not`, `(` and `)`
+- Keywords:
+    - `tagged` $\to$ tasks with at least on tag
+    - `untagged` $\to$ tasks with no tags
+
+Examples:
+```console
+./tt -f ".bug or untagged"
+./tt -f ".unfinished and not (.feature or .refactor)"
+```
+
+### Task Attributes
+
+When creating a new task, you can define the following attributes:
+
+_STATUS_
+
+One of:
+- `OPEN`
+- `IN_PROGRESS`
+- `CLOSED`
+
+By default, tasks with status `CLOSED` are excluded from the tasks list.
+
+_PRIORITY_
+
+- Integer value from 0 to 100
+
+Tasks are sorted by priority (descending) by default.
+
+_TAGS_
+
+- Free-from values defined by the user
+- Must be prefixed with `.`with filtering
+- Used with the `-f` option for querying tasks
+
+
