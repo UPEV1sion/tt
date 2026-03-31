@@ -80,7 +80,7 @@ After that a markdown file will be created in a folder with a timestamp (e.g. `t
 
 The user can add arbitrary files into the created folder and write additional information _after_ the preamble.
 For example:
-```markdown
+````markdown
 # Verbose output
 
 - STATUS: OPEN
@@ -100,7 +100,7 @@ $ ./tt -v
 > 
 > Add support for verbose output (-v, --verbose), to print the content of each task.
 ```
-```
+````
 
 
 
