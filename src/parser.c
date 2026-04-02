@@ -22,6 +22,8 @@ typedef enum {
     TOK_TAGGED,
     TOK_UNTAGGED,
     TOK_ID,
+    TOK_INVALID,
+    TOK_EOF,
 } TokenType;
 
 struct {
@@ -44,20 +46,21 @@ typedef struct {
 struct Lexer {
     size_t pos;
     const char *input;
-    Token *cur_tok;
-    Token *last_tok;
+    Token cur_tok;
+    Token last_tok;
     int cur_char;
 };
 
-Token* token_new(const TokenType type, const char *lexeme, const size_t pos)
+Token token_new(const TokenType type, const char *lexeme, const size_t pos)
 {
-    Token *tok = malloc(sizeof(Token));
-    assertmsg(tok != NULL, "ERROR: Count not create token!\n");
-    tok->type = type;
-    tok->lexeme = strdup(lexeme);
-    tok->pos = pos;
+    char *dupped = strdup(lexeme);
+    assertmsg(dupped != NULL, "ERROR: could not duplicate lexeme\n");
 
-    return tok;
+    return (Token) {
+        .type = type,
+        .lexeme = dupped,
+        .pos = pos,   
+    };
 }
 
 void lexer_advance(Lexer *lexer)
@@ -79,11 +82,11 @@ void lexer_match_char(Lexer *lexer, const int c)
     lexer_advance(lexer);
 }
 
-Token* lexer_next_tok(Lexer *lexer)
+Token lexer_next_tok(Lexer *lexer)
 {
     lexer_trim_left(lexer);
 
-    Token *tok = NULL;
+    Token tok = token_new(TOK_INVALID, "", 0);
     switch(lexer->cur_char)
     {
         case '(': {
@@ -160,15 +163,18 @@ Lexer *lexer_new(const char *source_code)
 
 bool match(Lexer *lexer, const TokenType type)
 {
-    if (lexer->cur_tok == NULL) return false;
-
-    if(lexer->cur_tok->type == type)
+    if(lexer->cur_tok.type == type)
     {
         lexer_next_tok(lexer);
         return true;
     }
 
     return false;
+}
+
+bool is_end(const Token token)
+{
+    return token.type == TOK_EOF || token.type == TOK_INVALID;
 }
 
 Op op_new(const OpCode code, const char *lexeme)
@@ -206,42 +212,42 @@ void parse_primary(Lexer *lexer, Ops *ops)
 {
     if(match(lexer, TOK_ID))
     {
-        const Op op = op_new(OP_ID, lexer->last_tok->lexeme);
+        const Op op = op_new(OP_ID, lexer->last_tok.lexeme);
         da_append(ops, op);
         return;
     }
 
     if(match(lexer, TOK_TAG))
     {
-        const Op op = op_new(OP_TAG, lexer->last_tok->lexeme);
+        const Op op = op_new(OP_TAG, lexer->last_tok.lexeme);
         da_append(ops, op);
         return;
     }
 
     if(match(lexer, TOK_TAGGED))
     {
-        const Op op = op_new(OP_TAGGED, lexer->last_tok->lexeme);
+        const Op op = op_new(OP_TAGGED, lexer->last_tok.lexeme);
         da_append(ops, op);
         return;
     }
 
     if(match(lexer, TOK_UNTAGGED))
     {
-        const Op op = op_new(OP_UNTAGGED, lexer->last_tok->lexeme);
+        const Op op = op_new(OP_UNTAGGED, lexer->last_tok.lexeme);
         da_append(ops, op);
         return;
     }
 
     if(match(lexer, TOK_LPAREN))
     {
-        const Token *lparen = lexer->last_tok;
+        const Token lparen = lexer->last_tok;
         parse_or(lexer, ops);
         if(!match(lexer, TOK_RPAREN))
         {
             fprintf(stderr, "ERROR: non matching parenthesis!\n");
             fprintf(stderr, "\"%s\"\n", lexer->input);
-            const size_t caret1 = lparen->pos;
-            const size_t caret2 = lexer->last_tok->pos - caret1 + strlen(lexer->last_tok->lexeme);
+            const size_t caret1 = lparen.pos;
+            const size_t caret2 = lexer->last_tok.pos - caret1 + strlen(lexer->last_tok.lexeme);
             fprintf(stderr, "%*s^%*s^\n", (int) caret1, "", (int) caret2, "");
             exit(1);
         }
@@ -249,7 +255,7 @@ void parse_primary(Lexer *lexer, Ops *ops)
         return;
     }
 
-    error(lexer->input, lexer->cur_tok->pos, "ERROR: expected primary expression: ID, Keyword or '('\n");
+    error(lexer->input, lexer->cur_tok.pos, "ERROR: expected primary expression: ID, Keyword or '('\n");
 }
 
 void parse_unary(Lexer *lexer, Ops *ops)
@@ -270,7 +276,7 @@ void parse_and(Lexer *lexer, Ops *ops)
     parse_unary(lexer, ops);
     while(match(lexer, TOK_AND))
     {
-        if (lexer->cur_tok == NULL) error(lexer->input, lexer->last_tok->pos, "ERROR: expected expression after \"and\"\n");
+        if (is_end(lexer->cur_tok)) error(lexer->input, lexer->last_tok.pos, "ERROR: expected expression after \"and\"\n");
 
         parse_unary(lexer, ops);
         const Op op = op_new(OP_AND, NULL);
@@ -283,7 +289,7 @@ void parse_or(Lexer *lexer, Ops *ops)
     parse_and(lexer, ops);
     while(match(lexer, TOK_OR))
     {
-        if (lexer->cur_tok == NULL) error(lexer->input, lexer->last_tok->pos, "ERROR: expected expression after \"or\"\n");
+        if (is_end(lexer->cur_tok)) error(lexer->input, lexer->last_tok.pos, "ERROR: expected expression after \"or\"\n");
 
         parse_and(lexer, ops);
         const Op op = op_new(OP_OR, NULL);
@@ -294,10 +300,10 @@ void parse_or(Lexer *lexer, Ops *ops)
 void parse_expr(Lexer *lexer, Ops *ops)
 {
     parse_or(lexer, ops);
-    if (lexer->cur_tok != NULL) 
+    if (is_end(lexer->cur_tok)) 
     {
-        error(lexer->input, lexer->cur_tok->pos, "ERROR: unexpected token \"%s%s\" at end of expression\n", 
-                (lexer->cur_tok->type == TOK_TAG) ? "." : "",
-                lexer->cur_tok->lexeme);
+        error(lexer->input, lexer->cur_tok.pos, "ERROR: unexpected token \"%s%s\" at end of expression\n", 
+                (lexer->cur_tok.type == TOK_TAG) ? "." : "",
+                lexer->cur_tok.lexeme);
     }
 }
