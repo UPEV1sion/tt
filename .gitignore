@@ -1,6 +1,7 @@
 *
 
 !*.c
+!*.py
 !*.h
 !*.md
 !LICENSE
@@ -9,3 +10,5 @@
 !tasks/
 !tasks/**
 !src/
+!tests/
+!tests/**
