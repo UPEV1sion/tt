@@ -72,13 +72,12 @@ DA_DEF int sv_cmp(StringView sv1, StringView sv2);
 DA_DEF bool sv_is_prefix(StringView sv, const char *prefix);
 DA_DEF StringView sv_trim(StringView sv);
 DA_DEF char* cstr_from_sv(StringView sv);
-DA_DEF char* cstr_from_sv(StringView sv);
 DA_DEF StringView sv_from_cstr(const char *s);
 DA_DEF int read_file(StringBuilder *sb, const char *path);
 
 #ifdef DA_IMPLEMENTATION
 
-StringView sv_from_sb(const StringBuilder *sb)
+DA_DEF StringView sv_from_sb(const StringBuilder *sb)
 {
     return (StringView) {
         .s = sb->items,
@@ -86,7 +85,7 @@ StringView sv_from_sb(const StringBuilder *sb)
     };
 }
 
-StringView sv_chop(StringView *sv, const int delim)
+DA_DEF StringView sv_chop(StringView *sv, const int delim)
 {
     if(sv->len == 0) return (StringView){NULL, 0};
 
@@ -112,12 +111,12 @@ StringView sv_chop(StringView *sv, const int delim)
     return ret;
 }
 
-DA_DEF bool sv_equal(StringView sv1, StringView sv2)
+DA_DEF bool sv_equal(const StringView sv1, const StringView sv2)
 {
     return sv_cmp(sv1, sv2) == 0;
 }
 
-DA_DEF int sv_cmp(StringView sv1, StringView sv2)
+DA_DEF int sv_cmp(const StringView sv1, const StringView sv2)
 {
     const size_t min_len = sv1.len < sv2.len ? sv1.len : sv2.len;
 
@@ -129,7 +128,7 @@ DA_DEF int sv_cmp(StringView sv1, StringView sv2)
     return 0;
 }
 
-bool sv_is_prefix(const StringView sv, const char *prefix)
+DA_DEF bool sv_is_prefix(const StringView sv, const char *prefix)
 {
     const size_t len = strlen(prefix);
     if(sv.len < len) return false;
@@ -142,7 +141,7 @@ bool sv_is_prefix(const StringView sv, const char *prefix)
     return true;
 }
 
-StringView sv_trim(StringView sv)
+DA_DEF StringView sv_trim(StringView sv)
 {
     while(sv.len > 0 && isspace((unsigned char) *sv.s))
     {
@@ -158,7 +157,7 @@ StringView sv_trim(StringView sv)
     return sv;
 }
 
-char* cstr_from_sv(const StringView sv)
+DA_DEF char* cstr_from_sv(const StringView sv)
 {
     char *str;
     assertmsg((str = malloc(sv.len + 1)) != NULL, "ERROR: Could not allocate cstr\n");
@@ -167,17 +166,15 @@ char* cstr_from_sv(const StringView sv)
     return str;
 }
 
-StringView sv_from_cstr(const char *s)
+DA_DEF StringView sv_from_cstr(const char *s)
 {
-    const char *dupped = strdup(s);
-    assertmsg(dupped != NULL, "ERROR: Could not duplicate string\n");
     return (StringView) {
-        .s = dupped,
-        .len = strlen(dupped)
+        .s = s,
+        .len = strlen(s)
     };
 }
 
-int read_file(StringBuilder *sb, const char *path)
+DA_DEF int read_file(StringBuilder *sb, const char *path)
 {
     FILE *f = fopen(path, "rb");
     assertmsg(f != NULL, "ERROR: Could not open file %s\n", path);
