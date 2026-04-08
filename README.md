@@ -1,6 +1,6 @@
 # Task Tracker
 
-A lightweight, git-agnostic command-line task tracker.
+A lightweight, git-hosting-agnostic command-line task tracker.
 Create, sort, and filter tasks using simple flags and a custom query language, all within your repository.
 This work is inspired by @[tsoding](https://github.com/tsoding)'s tasks tracker.
 
