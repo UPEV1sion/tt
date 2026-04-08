@@ -49,6 +49,7 @@ typedef struct {
         const size_t len = strlen(s); \
         da_reserve((sb), (sb)->count + len); \
         memcpy((sb)->items + (sb)->count, (s), len); \
+        (sb)->count += len; \
     } while(0)
 
 #define da_foreach(type, name, da) for(type *name = (da)->items; name < (da)->items + (da)->count; ++name)
