@@ -1,5 +1,5 @@
 CC := gcc
-CFLAGS := -Wall -Wextra -pedantic -ggdb
+CFLAGS := -Wall -Wextra -pedantic -O2
 
 SRC := src/main.c src/parser.c
 TEST_BIN := tests/integration/tt_test
