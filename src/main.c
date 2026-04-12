@@ -34,11 +34,12 @@ typedef enum {
 } TaskStatus;
 
 typedef struct {
-    StringView id;
+    char *id;
     StringView title;
     TaskStatus status;
     long prio;
     Tags tags;
+    StringBuilder backing;
 } Task;
 
 typedef struct {
@@ -72,19 +73,21 @@ void current_timestamp(char *buffer, const size_t buffer_size)
     assertmsg(strftime(buffer, buffer_size, "%Y%m%d-%H%M%S", lt) > 0, "ERROR: could not format time!\n");
 }
 
-Task parse_task(const StringView id)
+Task parse_task(char *id)
 {
     char path[BUFSIZE];
-    snprintf(path, BUFSIZE, "./tasks/"SV_FMT"/TASK.md", SV_ARG(id));
+    snprintf(path, BUFSIZE, "./tasks/%s/TASK.md", id);
 
     StringBuilder sb = {0};
     read_file(&sb, path);
     StringView sv = sv_from_sb(&sb);
 
-    Task task = {0};
     const StringView title = sv_chop(&sv, '\n');
-    task.title = title;
-    task.id = id;
+    Task task = {
+        .title = title,
+        .id = id,
+        .backing = sb,
+    };
     sv_chop(&sv, '\n');
 
     StringView meta;
@@ -120,7 +123,7 @@ Task parse_task(const StringView id)
                 exit(1); 
             }
 
-            static_assert(status_count_ == 3, "ERROR: non exhausive handling of STATUSES");
+            static_assert(status_count_ == 3, "ERROR: non exhaustive handling of STATUSES");
             if(sv_equal(trimmed, sv_from_cstr("OPEN")))
             {
                 task.status = OPEN;
@@ -173,21 +176,23 @@ Task parse_task(const StringView id)
 
 void create_task_folder(void)
 {
-    DIR *dir = opendir("./tasks");
-    if(dir == NULL)
-    {
-        fprintf(stderr, "ERROR: No 'tasks' folder found!\n");
-        fprintf(stderr, "INFO: Creating new 'tasks' folder\n");
-        if(mkdir("./tasks", 0755) != 0)
-        {
-            fprintf(stderr, "ERROR: Could not create 'tasks' folder: %s", strerror(errno));
-            exit(1);
-        }
+    struct stat st;
+    if (stat("./tasks", &st) == 0 && S_ISDIR(st.st_mode)) return;
 
-        errno = 0;
-        return;
+    fprintf(stderr, "ERROR: No 'tasks' folder found!\n");
+    fprintf(stderr, "INFO: Creating new 'tasks' folder\n");
+    if(mkdir("./tasks", 0755) != 0)
+    {
+        fprintf(stderr, "ERROR: Could not create 'tasks' folder: %s", strerror(errno));
+        exit(1);
     }
-    closedir(dir);
+}
+
+void task_free(const Task task)
+{
+    free(task.id);
+    da_free(&task.backing);
+    da_free(&task.tags);
 }
 
 void load_tasks(Tasks *tasks)
@@ -195,7 +200,7 @@ void load_tasks(Tasks *tasks)
     create_task_folder();
 
     DIR *dir = opendir("./tasks");
-    if(dir == NULL)
+    if(!dir) return;
     errno = 0;
     struct dirent *dir_entry;
     while((dir_entry = readdir(dir)) != NULL)
@@ -204,9 +209,15 @@ void load_tasks(Tasks *tasks)
 
         assertmsg(dir_entry->d_type == DT_DIR, 
                 "ERROR: malformed \"tasks\" folder. Please remove \"./tasks/%s\"!\n", dir_entry->d_name);
-        const StringView id = sv_from_cstr(dir_entry->d_name);
-        const Task task = parse_task(id);
-        if(task.status != CLOSED) da_append(tasks, task);
+        const Task task = parse_task(strdup(dir_entry->d_name));
+        if(task.status != CLOSED)
+        {
+            da_append(tasks, task);
+        }
+        else
+        {
+            task_free(task);
+        }
     }
 
     assertmsg(closedir(dir) == 0, "ERROR: Could not close \"tasks\" folder: %s\n", strerror(errno));
@@ -215,15 +226,13 @@ void load_tasks(Tasks *tasks)
 
 bool task_contains_tag(const Task task, const char *tag)
 {
+    const StringView tag_sv = sv_from_cstr(tag);
     da_foreach(StringView, sv, &task.tags)
     {
-        char *cur_tag = cstr_from_sv(*sv);
-        if(0 == strcmp(cur_tag, tag)) 
+        if(0 == sv_cmp(*sv, tag_sv))
         {
-            free(cur_tag);
             return true;
         }
-        free(cur_tag);
     }
     
     return false;
@@ -280,16 +289,18 @@ void filter_tasks(Tasks *tasks, const Ops *ops)
         stack.count = 0;
         if(!task_matches_filter(tasks->items[i - 1], ops, &stack))
         {
+            task_free(tasks->items[i - 1]);
             da_remove_unordered(tasks, i - 1);
         }
     }
+    da_free(&stack);
 }
 
 void dump_tasks(const Tasks *tasks)
 {
     da_foreach(Task, task, tasks)
     {
-        printf("./tasks/"SV_FMT"/TASK.md: [PRIORITY: %ld", SV_ARG(task->id), task->prio);
+        printf("./tasks/%s/TASK.md: [PRIORITY: %ld", task->id, task->prio);
         if(task->tags.count > 0) 
         {
             printf(", TAGS: ");
@@ -402,11 +413,11 @@ int task_cmp(const void *a, const void *b)
         case SORT_TIMESTAMP: {
             if (sort_options.desc)
             {
-                return sv_cmp(task_a->id, task_b->id);
+                return strcmp(task_a->id, task_b->id);
             }
             else
             {
-                return sv_cmp(task_b->id, task_a->id);
+                return strcmp(task_b->id, task_a->id);
             }
         } break;
         default: assertmsg(false, "UNREACHABLE");
@@ -434,9 +445,16 @@ int main(int argc, char **argv)
             const char *filter = shift_args(argc, argv);
             assertmsg(argc >= 0, "ERROR: no filter provided!\n");
             Lexer *lexer = lexer_new(filter);
+            if (!lexer) goto defer;
             Ops ops = {0};
             parse_expr(lexer, &ops);
             filter_tasks(&tasks, &ops);
+            da_foreach(Op, op, &ops)
+            {
+                free(op->lexeme);
+            }
+            da_free(&ops);
+            lexer_free(lexer);
         }
         else if(0 == strcmp("-d", flag) || 0 == strcmp("--date", flag))
         {
@@ -473,6 +491,12 @@ int main(int argc, char **argv)
 
     da_sort(&tasks, task_cmp);
     dump_tasks(&tasks);
+defer:
+    da_foreach(Task, task, &tasks)
+    {
+        task_free(*task);
+    }
+    da_free(&tasks);
 
     return 0;
 }

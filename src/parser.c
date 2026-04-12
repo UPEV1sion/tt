@@ -11,6 +11,9 @@
 #include "da.h"
 #include "common.h"
 
+#define ARENA_IMPLEMENTATION
+#include "arena.h"
+
 typedef enum {
     TOK_AND,
     TOK_OR,
@@ -44,17 +47,18 @@ typedef struct {
 
 struct Lexer {
     size_t pos;
-    const char *input;
+    char *input;
     Token cur_tok;
     Token last_tok;
     int cur_char;
+    Arena *arena;
 };
 
-Token token_new(const TokenType type, const char *lexeme, const size_t pos)
+Token token_new(Arena *arena, const TokenType type, const char *lexeme, const size_t pos)
 {
     return (Token) {
         .type = type,
-        .lexeme = lexeme ? strdup(lexeme) : NULL,
+        .lexeme = lexeme ? arena_strdup(arena, lexeme) : NULL,
         .pos = pos,
     };
 }
@@ -82,18 +86,18 @@ Token lexer_next_tok(Lexer *lexer)
 {
     lexer_trim_left(lexer);
 
-    Token tok = token_new(TOK_INVALID, NULL, 0);
+    Token tok = token_new(lexer->arena, TOK_INVALID, NULL, 0);
     switch(lexer->cur_char)
     {
         case '\0': {
-            tok = token_new(TOK_EOF, NULL, lexer->pos);
+            tok = token_new(lexer->arena, TOK_EOF, NULL, lexer->pos);
         } break;
         case '(': {
-            tok = token_new(TOK_LPAREN, NULL, lexer->pos);
+            tok = token_new(lexer->arena, TOK_LPAREN, NULL, lexer->pos);
             lexer_advance(lexer);
         } break;
         case ')': {
-            tok = token_new(TOK_RPAREN, NULL, lexer->pos);
+            tok = token_new(lexer->arena, TOK_RPAREN, NULL, lexer->pos);
             lexer_advance(lexer);
         } break;
         default : {
@@ -112,7 +116,7 @@ Token lexer_next_tok(Lexer *lexer)
                 }
 
                 buffer[pos] = 0;
-                tok = token_new(TOK_TAG, buffer, start);
+                tok = token_new(lexer->arena, TOK_TAG, buffer, start);
             }
             else if(isalpha(lexer->cur_char))
             {
@@ -138,7 +142,7 @@ Token lexer_next_tok(Lexer *lexer)
                     }
                 }
 
-                tok = token_new(type, buffer, start);
+                tok = token_new(lexer->arena, type, buffer, start);
             }
         } break;
     }
@@ -148,16 +152,38 @@ Token lexer_next_tok(Lexer *lexer)
     return tok;
 }
 
-Lexer *lexer_new(const char *source_code)
+Lexer* lexer_new(const char *source_code)
 {
-    Lexer *lexer = calloc(1, sizeof(Lexer));
-    assertmsg(lexer != NULL, "ERROR: Could not allocate lexer\n");
-    lexer->input = strdup(source_code);
-    assertmsg(lexer->input != NULL, "Could not allocate source string\n");
+    Lexer *lexer = NULL;
+
+    lexer = calloc(1, sizeof(Lexer));
+    if (!lexer) goto err;
+
+    lexer->arena = arena_new(1024);
+    if (!lexer->arena) goto err;
+
+    lexer->input = arena_strdup(lexer->arena, source_code);
+    if (!lexer->input) goto err;
+
     lexer_advance(lexer);
     lexer_next_tok(lexer);
 
     return lexer;
+
+err:
+    if (lexer)
+    {
+        if (lexer->arena) arena_free(lexer->arena);
+        free(lexer);
+    }
+
+    return NULL;
+}
+
+void lexer_free(Lexer *lexer)
+{
+    arena_free(lexer->arena);
+    free(lexer);
 }
 
 bool match(Lexer *lexer, const TokenType type)
@@ -180,7 +206,7 @@ Op op_new(const OpCode code, const char *lexeme)
 {
     return (Op) {
         .code = code,
-        .lexeme = lexeme != NULL ? strdup(lexeme) : NULL,
+        .lexeme = lexeme ? strdup(lexeme) : NULL,
     };
 }
 
@@ -247,7 +273,7 @@ void parse_primary(Lexer *lexer, Ops *ops)
             fprintf(stderr, "\"%s\"\n", lexer->input);
             const size_t last_tok_len = lexer->last_tok.lexeme ? strlen(lexer->last_tok.lexeme) : 1;
             const size_t caret1 = lparen.pos;
-            const size_t caret2 = lexer->last_tok.pos - caret1 + last_tok_len;
+            const size_t caret2 = lexer->last_tok.pos - caret1 + last_tok_len - 1;
             fprintf(stderr, "%*s^%*s^\n", (int) caret1, "", (int) caret2, "");
             exit(1);
         }

@@ -24,7 +24,7 @@ typedef enum {
 
 typedef struct {
     OpCode code;
-    const char *lexeme;
+    char *lexeme;
 } Op;
 
 typedef struct {
@@ -35,7 +35,8 @@ typedef struct {
 
 typedef struct Lexer Lexer;
 
-Lexer *lexer_new(const char *source_code);
+Lexer* lexer_new(const char *source_code);
+void lexer_free(Lexer *lexer);
 void parse_expr(Lexer *lexer, Ops *ops);
 char* op_to_str(Op op);
 

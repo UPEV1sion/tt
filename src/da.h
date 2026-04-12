@@ -62,6 +62,11 @@ typedef struct {
         (da)->items[idx] = (da)->items[--(da)->count];  \
     } while(0)
 
+#define da_free(da) \
+    do { \
+        free((da)->items); \
+    } while(0)
+
 #ifndef DA_DEF
 #define DA_DEF
 #endif // DA_DEF
@@ -169,6 +174,7 @@ DA_DEF char* cstr_from_sv(const StringView sv)
 
 DA_DEF StringView sv_from_cstr(const char *s)
 {
+    if (!s) return (StringView) {0};
     return (StringView) {
         .s = s,
         .len = strlen(s)
