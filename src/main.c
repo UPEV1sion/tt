@@ -316,6 +316,7 @@ void dump_tasks(const Tasks *tasks)
     }
 }
 
+
 void create_new_task(void)
 {
     char timestamp[128];
@@ -424,23 +425,15 @@ int task_cmp(const void *a, const void *b)
     }
 }
 
-int main(int argc, char **argv)
+void list_tasks(int argc, char **argv)
 {
-    const char *program = shift_args(argc, argv);
     Tasks tasks = {0};
     load_tasks(&tasks);
 
-    // TASK(20260328-085723)
-    // TASK(20260328-090107)
     while(argc > 0)
     {
         const char *flag = shift_args(argc, argv);
-        if(0 == strcmp("-n", flag) || 0 == strcmp("--new", flag))
-        {
-            create_new_task();
-            return 0;
-        }
-        else if(0 == strcmp("-f", flag) || 0 == strcmp("--filter", flag))
+        if(0 == strcmp(flag, "-f") || 0 == strcmp(flag, "--filter"))
         {
             const char *filter = shift_args(argc, argv);
             assertmsg(argc >= 0, "ERROR: no filter provided!\n");
@@ -454,7 +447,7 @@ int main(int argc, char **argv)
                 free(op->lexeme);
             }
             da_free(&ops);
-            lexer_free(lexer);
+            lexer_free(lexer)
         }
         else if(0 == strcmp("-d", flag) || 0 == strcmp("--date", flag))
         {
@@ -476,27 +469,75 @@ int main(int argc, char **argv)
             sort_options.desc = false;
             sort_options.target = SORT_PRIO;
         }
-        else if(0 == strcmp("-h", flag) || 0 == strcmp("--help", flag))
-        {
-            print_usage(program);
-            return 0;
-        }
-        else
-        {
-            fprintf(stderr, "ERROR: Invalid flag \"%s\"\n", flag);
-            print_usage(program);
-            return 1;
-        }
     }
 
-    da_sort(&tasks, task_cmp);
-    dump_tasks(&tasks);
-defer:
+
     da_foreach(Task, task, &tasks)
     {
         task_free(*task);
     }
     da_free(&tasks);
+}
+
+
+void edit_tasks(int argc, char **argv)
+{
+    while(argc > 0)
+    {
+        const char *flag = shift_args(argc, argv);
+        if(0 == strcmp(flag, "-s") || 0 == strcmp(flag, "--status"))
+        {
+
+        }
+        else if(0 == strcmp(flag, "-p") || 0 == strcmp(flag, "--priority"))
+        {
+
+        }
+        else if(0 == strcmp(flag, "-t") || 0 == strcmp(flag, "--tags"))
+        {
+
+        }
+        else
+        {
+
+        }
+    }
+
+}
+
+int main(int argc, char **argv)
+{
+    const char *program = shift_args(argc, argv);
+    if(0 == argc)
+    {
+        cmd_list(argc, argv);
+        return 0;
+    }
+
+    const char *subcommand = shift_args(argc, argv);
+
+    if(0 == strcmp(subcommand, "new"))
+    {
+        create_new_task();
+    }
+    else if(0 == strcmp(subcommand, "list"))
+    {
+        list_tasks(argc, argv); 
+    }
+    else if(0 == strcmp(subcommand, "edit"))
+    {
+        edit_tasks(argc, argv);
+    }
+    else if(0 == strcmp(subcommand, "help"))
+    {
+        print_usage(program);
+    }
+    else
+    {
+        fprintf(stderr, "ERROR: Unknown subcommand or flag: '%s'\n", subcommand);
+        print_usage(program);
+        return 1;
+    }
 
     return 0;
 }
