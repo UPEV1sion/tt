@@ -18,7 +18,7 @@ The utility leverages an explicit subcommand system to manage tasks:
 1. new
 Creates new task interactively and put in the task folder
 
-1. list
+2. list
 
 Displays active (OPEN, IN\_PROGRESS) tasks. Running ./tt without arguments defaults to listing your tasks.
 ```text
@@ -32,7 +32,7 @@ Options:
     -f, --filter    Filter tasks using the Query Language
 ```    
 
-1. edit
+3. edit
 Modifies an existing task's file metadata without affecting any commentary text below the preamble.
 ```text
 Options:
