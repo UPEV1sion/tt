@@ -8,27 +8,40 @@ This work is inspired by @[tsoding](https://github.com/tsoding)'s tasks tracker.
 
 ```console
 $ make
-$ ./tt <flags>
+$ ./tt <subcommand> [options]
 ```
 
-## Features
+## Subcommands & Features
 
-This utility provides facilities to create, sort tasks and filter tasks:
-```console
-    -h, --help:      print help
+The utility leverages an explicit subcommand system to manage tasks:
 
-    -n, --new:       create a new task
+1. new
+Creates new task interactively and put in the task folder
 
-    -d, --date:      sort by creation date (descending)
-    -D, --Date:      sort by creation date (ascending)
+1. list
 
-    -p, --priority:  sort by priority (descending, default)
-    -P, --Priority:  sort by priority (ascending)
+Displays active (OPEN, IN\_PROGRESS) tasks. Running ./tt without arguments defaults to listing your tasks.
+```text
+Options:
+    -d, --date      Sort by creation date (descending)
+    -D, --Date      Sort by creation date (ascending)
 
-    -f, --filter:    filter existing tasks
-``` 
+    -p, --priority  Sort by priority (descending, default)
+    -P, --Priority  Sort by priority (ascending)
 
-### Filter syntax
+    -f, --filter    Filter tasks using the Query Language
+```    
+
+1. edit
+Modifies an existing task's file metadata without affecting any commentary text below the preamble.
+```text
+Options:
+    -s, --status    Set task status (OPEN, IN_PROGRESS, CLOSED)
+    -p, --priority  Set task priority (0-100)
+    -t, --tags      Overwrite task tags (comma-separated)
+```
+
+## Filter syntax
 
 You can filter tasks using a simple query language:
 - Tags must be prefixed with a `.` (e.g. `.bug`)
@@ -39,11 +52,11 @@ You can filter tasks using a simple query language:
 
 Examples:
 ```console
-./tt -f ".bug or untagged"
-./tt -f ".unfinished and not (.feature or .refactor)"
+./tt list -f ".bug or untagged"
+./tt list -f ".unfinished and not (.feature or .refactor)"
 ```
 
-### Task Attributes
+## Task Attributes
 
 When creating a new task, you can define the following attributes:
 
@@ -101,8 +114,4 @@ $ ./tt -v
 > Add support for verbose output (-v, --verbose), to print the content of each task.
 ```
 ````
-
-
-
-
 
