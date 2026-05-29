@@ -522,7 +522,7 @@ int edit_tasks(int argc, char **argv)
         else if(0 == strcmp(flag, "-p") || 0 == strcmp(flag, "--priority"))
         {
             assertmsg(argc > 0, "ERROR: priority flag required an argument\n");
-            const char *prio_str = shift_args(argv, argv);
+            const char *prio_str = shift_args(argc, argv);
             char *endptr;
             new_prio = strtol(prio_str, &endptr, 10);
             assertmsg(*endptr == 0 && new_prio >= 0 && new_prio <= 100, "ERROR: Invalid priority (0-100)\n");
@@ -577,7 +577,7 @@ int edit_tasks(int argc, char **argv)
             if(new_tags)
             {
                 char buf[BUFSIZE];
-                const int len = snprintf(buf, sizeof(buf), "- TAGS: %ld\n", new_prio);
+                const int len = snprintf(buf, sizeof(buf), "- TAGS: %s\n", new_tags);
                 da_append_many(&output, buf, len);
             }
             else
@@ -593,7 +593,7 @@ int edit_tasks(int argc, char **argv)
             if(new_tags && !has_tags)
             {
                 char buf[BUFSIZE];
-                const int len = snprintf(buf, sizeof(buf), "- TAGS: %ld\n", new_prio);
+                const int len = snprintf(buf, sizeof(buf), "- TAGS: %s\n", new_tags);
                 da_append_many(&output, buf, len);
                 has_tags = true;
             }
