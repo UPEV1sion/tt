@@ -447,7 +447,7 @@ void list_tasks(int argc, char **argv)
                 free(op->lexeme);
             }
             da_free(&ops);
-            lexer_free(lexer)
+            lexer_free(lexer);
         }
         else if(0 == strcmp("-d", flag) || 0 == strcmp("--date", flag))
         {
@@ -471,7 +471,10 @@ void list_tasks(int argc, char **argv)
         }
     }
 
+    da_sort(&tasks, task_cmp);
+    dump_tasks(&tasks);
 
+defer:
     da_foreach(Task, task, &tasks)
     {
         task_free(*task);
@@ -480,29 +483,143 @@ void list_tasks(int argc, char **argv)
 }
 
 
-void edit_tasks(int argc, char **argv)
+int edit_tasks(int argc, char **argv)
 {
+    if (argc < 1) 
+    {
+        fprintf(stderr, "USAGE: tt edit <task-id> [options]\n");
+        fprintf(stderr, "OPTIONS:\n");
+        fprintf(stderr, "    -s, --status <STATUS>    Set task status (OPEN, IN_PROGRESS, CLOSED)\n");
+        fprintf(stderr, "    -p, --priority <0-100>   Set task priority\n");
+        fprintf(stderr, "    -t, --tags <tags>        Overwrite task tags (comma-separated)\n");
+        return 1;
+    }
+
+    const char *task_id = shift_args(argc, argv);
+
+    const char *new_status = NULL;
+    const char *new_tags   = NULL;
+    long new_prio          = -1;
+
     while(argc > 0)
     {
         const char *flag = shift_args(argc, argv);
         if(0 == strcmp(flag, "-s") || 0 == strcmp(flag, "--status"))
         {
+            assertmsg(argc > 0, "ERROR: status flag required an argument\n");
+            new_status = shift_args(argc, argv);
+            static_assert(status_count_ == 3, "status count has changed");
+            if(0 != strcmp(new_status, "OPEN") &&
+                    0 != strcmp(new_status, "IN_PROGRESS") &&
+                    0 != strcmp(new_status, "CLOSED"))
+            {
+                fprintf(stderr, "ERROR: Invalid status \"%s\"\n", new_status);
+                fprintf(stderr, "ERROR: Available options: \"OPEN\", \"IN_PROGRESS\", \"CLOSED\"\n");
+                return 1; 
+            }
 
         }
         else if(0 == strcmp(flag, "-p") || 0 == strcmp(flag, "--priority"))
         {
-
+            assertmsg(argc > 0, "ERROR: priority flag required an argument\n");
+            const char *prio_str = shift_args(argv, argv);
+            char *endptr;
+            new_prio = strtol(prio_str, &endptr, 10);
+            assertmsg(*endptr == 0 && new_prio >= 0 && new_prio <= 100, "ERROR: Invalid priority (0-100)\n");
         }
         else if(0 == strcmp(flag, "-t") || 0 == strcmp(flag, "--tags"))
         {
-
+            assertmsg(argc > 0, "ERROR: tags flag required an argument");
+            new_tags = shift_args(argc, argv);
         }
         else
         {
-
+            fprintf(stderr, "ERROR: Unknown edit option '%s'\n", flag);
+            return 1;
         }
     }
 
+    if(!new_status && new_prio == -1 && !new_tags)
+    {
+        fprintf(stderr, "WARNING: Nothing to edit. Provide -s, -p, or -t flags.\n");
+        return 0;
+    }
+
+    char path[BUFSIZE];
+    snprintf(path, sizeof(path), "./tasks/%s/TASK.md", task_id);
+
+    StringBuilder sb = {0};
+    read_file(&sb, path);
+    StringView sv = sv_from_sb(&sb);
+
+    StringBuilder output = {0};
+    StringView line;
+    bool has_tags = false;
+    bool preamble_passed = false;
+
+    while((line = sv_chop(&sv, '\n')).len > 0 || sv.len > 0)
+    {
+        if(sv_is_prefix(line, "- STATUS") && new_status)
+        {
+            char buf[128];
+            const int len = snprintf(buf, sizeof(buf), "- STATUS: %s\n", new_status);
+            da_append_many(&output, buf, len);
+        }
+        else if(sv_is_prefix(line, "- PRIORITY") && new_prio != -1)
+        {
+            char buf[128];
+            const int len = snprintf(buf, sizeof(buf), "- PRIORITY: %ld\n", new_prio);
+            da_append_many(&output, buf, len);
+        }
+        else if(sv_is_prefix(line, "- TAGS"))
+        {
+            has_tags = true;
+            if(new_tags)
+            {
+                char buf[BUFSIZE];
+                const int len = snprintf(buf, sizeof(buf), "- TAGS: %ld\n", new_prio);
+                da_append_many(&output, buf, len);
+            }
+            else
+            {
+                da_append_many(&output, line.s, line.len);
+                da_append(&output, '\n');
+            }
+        }
+        else if(line.len == 0 && !preamble_passed)
+        {
+            preamble_passed = true;
+
+            if(new_tags && !has_tags)
+            {
+                char buf[BUFSIZE];
+                const int len = snprintf(buf, sizeof(buf), "- TAGS: %ld\n", new_prio);
+                da_append_many(&output, buf, len);
+                has_tags = true;
+            }
+
+            da_append(&output, '\n');
+        }
+        else
+        {
+            da_append_many(&output, line.s, line.len);
+            da_append(&output, '\n');
+        }
+
+        if(sv.len == 0 && line.len == 0) break;
+    }
+
+    FILE *fp = fopen(path, "w");
+    assertmsg(fp != NULL, "ERROR: Could not write to file\n");
+    fwrite(output.items, 1, output.count, fp);
+    fclose(fp);
+
+    printf("SUCCESS: Updated task %s\n", task_id);
+
+    da_free(&sb);
+    da_free(&output);
+
+    return 0;
 }
 
 int main(int argc, char **argv)
@@ -510,7 +627,7 @@ int main(int argc, char **argv)
     const char *program = shift_args(argc, argv);
     if(0 == argc)
     {
-        cmd_list(argc, argv);
+        list_tasks(argc, argv);
         return 0;
     }
 

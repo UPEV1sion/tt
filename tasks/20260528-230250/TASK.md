@@ -1,6 +1,6 @@
 # Subcommand system
 
-- STATUS: IN_PROGRESS
+- STATUS: CLOSED
 - PRIORITY: 70
 - TAGS: ux, cli
 
