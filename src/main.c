@@ -383,17 +383,27 @@ void create_new_task(void)
 
 void print_usage(const char *program)
 {
-    printf("USAGE: %s <flags>\n", program);
-    printf("    -h, --help:      print help\n");
-    printf("    -n, --new:       create a new task\n");
-    printf("    -d, --date:      sort by creation date (descending)\n");
-    printf("    -D, --Date:      sort by creation date (ascending)\n");
-    printf("    -p, --priority:  sort by priority (descending, default)\n");
-    printf("    -P, --Priority:  sort by priority (ascending)\n");
-    printf("    -f, --filter:    filter existing tasks\n");
-    printf("        syntax: '.<tag>', 'and', 'or', 'not', 'tagged', untagged, '(' and ')'\n");
-    printf("        example: -f \".bug or untagged\"\n");
-    printf("        example: -f \".unfinished and not (.feature or .refactor)\"\n");
+    printf("USAGE: %s <subcommand> [options]\n\n", program);
+    printf("SUBCOMMANDS:\n");
+    printf("    new                        Create a new task interactively\n");
+    printf("    list [options]             List, sort, and filter active tasks (default)\n");
+    printf("    edit <task-id> [options]   Modify an existing task's metadata\n");
+    printf("    help                       Print this help menu\n\n");
+    
+    printf("OPTIONS FOR \"list\":\n");
+    printf("    -d, --date                 Sort by creation date (descending)\n");
+    printf("    -D, --Date                 Sort by creation date (ascending)\n");
+    printf("    -p, --priority             Sort by priority (descending, default)\n");
+    printf("    -P, --Priority             Sort by priority (ascending)\n");
+    printf("    -f, --filter <query>       Filter tasks using a query string\n");
+    printf("                               Syntax:  '.<tag>', 'and', 'or', 'not', 'tagged', 'untagged', '(', ')'\n");
+    printf("                               Example: list -f \".bug or untagged\"\n\n");
+    
+    printf("OPTIONS FOR \"edit\":\n");
+    printf("    -s, --status <STATUS>      Set task status (OPEN, IN_PROGRESS, CLOSED)\n");
+    printf("    -p, --priority <0-100>     Set task priority\n");
+    printf("    -t, --tags <tags>          Overwrite task tags (comma-separated)\n");
+    printf("                               Example: edit 20260328-085723 -s IN_PROGRESS -p 80\n");
 }
 
 static SortOptions sort_options = {.desc = true, .target = SORT_PRIO};
