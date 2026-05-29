@@ -44,6 +44,13 @@ typedef struct {
         (da)->items[(da)->count++] = (item); \
     } while(0)
 
+#define da_append_many(da, item, sz) \
+    do { \
+        da_reserve((da), (da)->count + sz); \
+        memcpy((da)->items + (da)->count, (item), sz); \
+        (da)->count += sz; \
+     } while(0) 
+
 #define sb_append(sb, s) \
     do { \
         const size_t len = strlen(s); \
