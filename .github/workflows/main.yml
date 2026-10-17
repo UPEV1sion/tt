@@ -3,7 +3,7 @@ on:
   pull_request:
   push:
 jobs:
-  build-scores:
+  build-task-tracker:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -16,4 +16,4 @@ jobs:
       with:
         name: build-output
         path: |
-           out/
+           result/bin/tt
