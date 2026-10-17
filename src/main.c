@@ -455,7 +455,7 @@ int task_cmp(const void *a, const void *b)
     }
 }
 
-void list_tasks(int argc, char **argv)
+int list_tasks(int argc, char **argv)
 {
     Tasks tasks = {0};
     load_tasks(&tasks);
@@ -504,6 +504,11 @@ void list_tasks(int argc, char **argv)
         {
             all_tasks = true;
         }
+        else
+        {
+            fprintf(stderr, "ERROR: unknown list flag '%s'\n", flag);
+            return 1;
+        }
     }
 
     da_sort(&tasks, task_cmp);
@@ -515,6 +520,8 @@ defer:
         task_free(*task);
     }
     da_free(&tasks);
+
+    return 0;
 }
 
 
