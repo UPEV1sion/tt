@@ -4,6 +4,8 @@
 !*.py
 !*.h
 !*.md
+!*.nix
+!*.lock
 !LICENSE
 !Makefile
 !.gitignore
