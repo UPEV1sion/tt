@@ -6,11 +6,8 @@
 !*.md
 !*.nix
 !*.lock
+!*.yml
 !LICENSE
 !Makefile
 !.gitignore
-!tasks/
-!tasks/**
-!src/
-!tests/
-!tests/**
+!**/
