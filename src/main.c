@@ -64,6 +64,18 @@ typedef struct {
     bool desc;
 } SortOptions;
 
+
+const char* status_to_str(const TaskStatus status)
+{
+    switch (status)
+    {
+        case OPEN:        return "OPEN";
+        case IN_PROGRESS: return "IN_PROGRESS";
+        case CLOSED:      return "CLOSED";
+        default: assert(0 && "Unreacheable");
+    }
+}
+
 void current_timestamp(char *buffer, const size_t buffer_size)
 {
     const time_t t = time(NULL);
@@ -210,14 +222,7 @@ void load_tasks(Tasks *tasks)
         assertmsg(dir_entry->d_type == DT_DIR, 
                 "ERROR: malformed \"tasks\" folder. Please remove \"./tasks/%s\"!\n", dir_entry->d_name);
         const Task task = parse_task(strdup(dir_entry->d_name));
-        if(task.status != CLOSED)
-        {
-            da_append(tasks, task);
-        }
-        else
-        {
-            task_free(task);
-        }
+        da_append(tasks, task);
     }
 
     assertmsg(closedir(dir) == 0, "ERROR: Could not close \"tasks\" folder: %s\n", strerror(errno));
@@ -296,11 +301,25 @@ void filter_tasks(Tasks *tasks, const Ops *ops)
     da_free(&stack);
 }
 
-void dump_tasks(const Tasks *tasks)
+void dump_tasks(const Tasks *tasks, bool all_tasks)
 {
     da_foreach(Task, task, tasks)
-    {
-        printf("./tasks/%s/TASK.md: [PRIORITY: %ld", task->id, task->prio);
+    { 
+        if (!all_tasks && CLOSED == task->status) continue;
+
+        switch (task->status)
+        {
+            case OPEN:        printf("\033[96m"); break; // blue
+            case IN_PROGRESS: printf("\033[93m"); break; // yellow
+            case CLOSED:      printf("\033[90m"); break; // gray
+            default: assert(0 && "Unreachable");
+        }
+
+        printf("./tasks/%s/TASK.md: [STATUS: %s, PRIORITY: %ld", 
+                task->id, 
+                status_to_str(task->status), 
+                task->prio
+        );
         if(task->tags.count > 0) 
         {
             printf(", TAGS: ");
@@ -312,7 +331,7 @@ void dump_tasks(const Tasks *tasks)
         }
         assertmsg(task->title.len >= 2, "ERROR: malformed title\""SV_FMT"\"\n", SV_ARG(task->title));
         const StringView tmp_title = {.s = task->title.s + 2, .len = task->title.len - 2};
-        printf("] "SV_FMT"\n", SV_ARG(tmp_title));
+        printf("] "SV_FMT"\033[0m\n", SV_ARG(tmp_title));
     }
 }
 
@@ -396,6 +415,7 @@ void print_usage(const char *program)
     printf("    -p, --priority             Sort by priority (descending, default)\n");
     printf("    -P, --Priority             Sort by priority (ascending)\n");
     printf("    -f, --filter <query>       Filter tasks using a query string\n");
+    printf("    -a, --all                  Display all tasks, even the closed ones\n");
     printf("                               Syntax:  '.<tag>', 'and', 'or', 'not', 'tagged', 'untagged', '(', ')'\n");
     printf("                               Example: list -f \".bug or untagged\"\n\n");
     
@@ -439,6 +459,7 @@ void list_tasks(int argc, char **argv)
 {
     Tasks tasks = {0};
     load_tasks(&tasks);
+    bool all_tasks = false;
 
     while(argc > 0)
     {
@@ -479,10 +500,14 @@ void list_tasks(int argc, char **argv)
             sort_options.desc = false;
             sort_options.target = SORT_PRIO;
         }
+        else if(0 == strcmp("-a", flag) || 0 == strcmp("--all", flag))
+        {
+            all_tasks = true;
+        }
     }
 
     da_sort(&tasks, task_cmp);
-    dump_tasks(&tasks);
+    dump_tasks(&tasks, all_tasks);
 
 defer:
     da_foreach(Task, task, &tasks)
@@ -615,8 +640,6 @@ int edit_tasks(int argc, char **argv)
             da_append_many(&output, line.s, line.len);
             da_append(&output, '\n');
         }
-
-        if(sv.len == 0 && line.len == 0) break;
     }
 
     FILE *fp = fopen(path, "w");

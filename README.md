@@ -31,6 +31,8 @@ Options:
     -P, --Priority  Sort by priority (ascending)
 
     -f, --filter    Filter tasks using the Query Language
+
+    -a, --all       Display all tasks, even the closed ones
 ```    
 
 3. `edit`
