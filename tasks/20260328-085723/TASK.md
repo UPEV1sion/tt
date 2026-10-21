@@ -1,6 +1,6 @@
 # Verbose output
 
-- STATUS: OPEN
+- STATUS: CLOSED
 - PRIORITY: 20
 - TAGS: feature, cli
 

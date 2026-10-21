@@ -303,7 +303,7 @@ void filter_tasks(Tasks *tasks, const Ops *ops)
     da_free(&stack);
 }
 
-void dump_tasks(const Tasks *tasks, bool all_tasks)
+void dump_tasks(const Tasks *tasks, bool all_tasks, bool verbose)
 {
     da_foreach(Task, task, tasks)
     { 
@@ -322,7 +322,7 @@ void dump_tasks(const Tasks *tasks, bool all_tasks)
                 status_to_str(task->status), 
                 task->prio
         );
-        if(task->tags.count > 0) 
+        if (task->tags.count > 0) 
         {
             printf(", TAGS: ");
             printf(SV_FMT, SV_ARG(*task->tags.items));
@@ -334,6 +334,11 @@ void dump_tasks(const Tasks *tasks, bool all_tasks)
         assertmsg(task->title.len >= 2, "ERROR: malformed title\""SV_FMT"\"\n", SV_ARG(task->title));
         const StringView tmp_title = {.s = task->title.s + 2, .len = task->title.len - 2};
         printf("] "SV_FMT"\033[0m\n", SV_ARG(tmp_title));
+        if (verbose)
+        {
+            StringView content = sv_from_sb(&task->backing);
+            printf("--------------------\n"SV_FMT"\n--------------------\n\n\n", SV_ARG(content));
+        }
     }
 }
 
@@ -462,6 +467,7 @@ int list_tasks(int argc, char **argv)
     Tasks tasks = {0};
     load_tasks(&tasks);
     bool all_tasks = false;
+    bool verbose = false;
 
     while(argc > 0)
     {
@@ -506,6 +512,10 @@ int list_tasks(int argc, char **argv)
         {
             all_tasks = true;
         }
+        else if(0 == strcmp("-v", flag) || 0 == strcmp("--verbose", flag))
+        {
+            verbose = true;
+        }
         else
         {
             fprintf(stderr, "ERROR: unknown list flag '%s'\n", flag);
@@ -514,7 +524,7 @@ int list_tasks(int argc, char **argv)
     }
 
     da_sort(&tasks, task_cmp);
-    dump_tasks(&tasks, all_tasks);
+    dump_tasks(&tasks, all_tasks, verbose);
 
 defer:
     da_foreach(Task, task, &tasks)
