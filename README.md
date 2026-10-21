@@ -33,6 +33,8 @@ Options:
     -f, --filter    Filter tasks using the Query Language
 
     -a, --all       Display all tasks, even the closed ones
+
+    -v, --verbose   Display the whole task file
 ```    
 
 3. `edit`

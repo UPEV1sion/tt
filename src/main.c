@@ -423,6 +423,7 @@ void print_usage(const char *program)
     printf("    -P, --Priority             Sort by priority (ascending)\n");
     printf("    -f, --filter <query>       Filter tasks using a query string\n");
     printf("    -a, --all                  Display all tasks, even the closed ones\n");
+    printf("    -v, --verbose              Display the whole task file\n");
     printf("                               Syntax:  '.<tag>', 'and', 'or', 'not', 'tagged', 'untagged', '(', ')'\n");
     printf("                               Example: list -f \".bug or untagged\"\n\n");
     
