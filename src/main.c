@@ -191,11 +191,11 @@ void create_task_folder(void)
     struct stat st;
     if (stat("./tasks", &st) == 0 && S_ISDIR(st.st_mode)) return;
 
-    fprintf(stderr, "ERROR: No 'tasks' folder found!\n");
-    fprintf(stderr, "INFO: Creating new 'tasks' folder\n");
+    fprintf(stderr, "ERROR: No \"tasks\" folder found!\n");
+    fprintf(stderr, "INFO: Creating new \"tasks\" folder\n");
     if(mkdir("./tasks", 0755) != 0)
     {
-        fprintf(stderr, "ERROR: Could not create 'tasks' folder: %s", strerror(errno));
+        fprintf(stderr, "ERROR: Could not create \"tasks\" folder: %s", strerror(errno));
         exit(1);
     }
 }
@@ -209,10 +209,12 @@ void task_free(const Task task)
 
 void load_tasks(Tasks *tasks)
 {
-    create_task_folder();
-
     DIR *dir = opendir("./tasks");
-    if(!dir) return;
+    if(!dir)
+    {
+        fprintf(stderr, "ERROR: No \"tasks\" folder found!\n");
+        return;
+    }
     errno = 0;
     struct dirent *dir_entry;
     while((dir_entry = readdir(dir)) != NULL)
