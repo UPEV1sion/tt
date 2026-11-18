@@ -440,8 +440,8 @@ static void create_new_task(void)
     fprintf(fp, "# %s\n\n", title);
     fprintf(fp, "- STATUS: %s\n", status);
     fprintf(fp, "- PRIORITY: %ld\n", prio);
-    if(strlen(tags) > 0) fprintf(fp, "- TAGS: %s", tags);
-    if(strlen(refs) > 0) fprintf(fp, "- REFERENCES: %s", refs);
+    if(strlen(tags) > 0) fprintf(fp, "- TAGS: %s\n", tags);
+    if(strlen(refs) > 0) fprintf(fp, "- REFERENCES: %s\n", refs);
 
     fclose(fp);
 
@@ -538,6 +538,7 @@ static void sort_topological(Tasks *tasks)
         sorted[sorted_count] = tasks->items[cur_idx];
         sorted_count += sort_options.desc ? -1 : 1;
         StringView cur_id = sv_from_cstr(tasks->items[cur_idx].id);
+        // TODO more efficient lookup and id validation
         for (size_t i = 0; i < n; ++i)
         {
             da_foreach(StringView, ref, &tasks->items[i].refs) 

@@ -54,7 +54,7 @@ struct Lexer {
     Arena *arena;
 };
 
-Token token_new(Arena *arena, const TokenType type, const char *lexeme, const size_t pos)
+static Token token_new(Arena *arena, const TokenType type, const char *lexeme, const size_t pos)
 {
     return (Token) {
         .type = type,
@@ -63,12 +63,12 @@ Token token_new(Arena *arena, const TokenType type, const char *lexeme, const si
     };
 }
 
-void lexer_advance(Lexer *lexer)
+static void lexer_advance(Lexer *lexer)
 {
     lexer->cur_char = (unsigned char) lexer->input[lexer->pos++];
 }
 
-void lexer_trim_left(Lexer *lexer)
+static void lexer_trim_left(Lexer *lexer)
 {
     while(isspace((unsigned char) lexer->cur_char))
     {
@@ -76,13 +76,7 @@ void lexer_trim_left(Lexer *lexer)
     }
 }
 
-void lexer_match_char(Lexer *lexer, const int c)
-{
-    assertmsg(lexer->cur_char == c, "ERROR: unexpected char '%c'\n", c);
-    lexer_advance(lexer);
-}
-
-Token lexer_next_tok(Lexer *lexer)
+static Token lexer_next_tok(Lexer *lexer)
 {
     lexer_trim_left(lexer);
 
@@ -186,7 +180,7 @@ void lexer_free(Lexer *lexer)
     free(lexer);
 }
 
-bool match(Lexer *lexer, const TokenType type)
+static bool match(Lexer *lexer, const TokenType type)
 {
     if(lexer->cur_tok.type == type)
     {
@@ -197,12 +191,12 @@ bool match(Lexer *lexer, const TokenType type)
     return false;
 }
 
-bool is_end(const Token token)
+static bool is_end(const Token token)
 {
     return token.type == TOK_INVALID || token.type == TOK_EOF;
 }
 
-Op op_new(const OpCode code, const char *lexeme)
+static Op op_new(const OpCode code, const char *lexeme)
 {
     return (Op) {
         .code = code,
@@ -229,11 +223,11 @@ char* op_to_str(const Op op)
         exit(1); \
     } while(0)
 
-void parse_unary(Lexer *lexer, Ops *ops);
-void parse_and(Lexer *lexer, Ops *ops);
-void parse_or(Lexer *lexer, Ops *ops);
+static void parse_unary(Lexer *lexer, Ops *ops);
+static void parse_and(Lexer *lexer, Ops *ops);
+static void parse_or(Lexer *lexer, Ops *ops);
 
-void parse_primary(Lexer *lexer, Ops *ops)
+static void parse_primary(Lexer *lexer, Ops *ops)
 {
     if(match(lexer, TOK_ID))
     {
@@ -284,7 +278,7 @@ void parse_primary(Lexer *lexer, Ops *ops)
     error(lexer->input, lexer->cur_tok.pos, "ERROR: expected primary expression: ID, Keyword or '('\n");
 }
 
-void parse_unary(Lexer *lexer, Ops *ops)
+static void parse_unary(Lexer *lexer, Ops *ops)
 {
     if(match(lexer, TOK_NOT))
     {
@@ -297,7 +291,7 @@ void parse_unary(Lexer *lexer, Ops *ops)
     parse_primary(lexer, ops);
 }
 
-void parse_and(Lexer *lexer, Ops *ops)
+static void parse_and(Lexer *lexer, Ops *ops)
 {
     parse_unary(lexer, ops);
     while(match(lexer, TOK_AND))
@@ -310,7 +304,7 @@ void parse_and(Lexer *lexer, Ops *ops)
     }
 }
 
-void parse_or(Lexer *lexer, Ops *ops)
+static void parse_or(Lexer *lexer, Ops *ops)
 {
     parse_and(lexer, ops);
     while(match(lexer, TOK_OR))
