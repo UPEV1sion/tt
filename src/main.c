@@ -26,6 +26,12 @@ typedef struct {
     StringView *items;
 } Tags;
 
+typedef struct {
+    size_t count;
+    size_t capacity;
+    StringView *items;
+} References;
+
 typedef enum {
     OPEN,
     IN_PROGRESS,
@@ -39,6 +45,7 @@ typedef struct {
     TaskStatus status;
     long prio;
     Tags tags;
+    References refs;
     StringBuilder backing;
 } Task;
 
@@ -57,6 +64,7 @@ typedef struct {
 typedef enum {
     SORT_TIMESTAMP,
     SORT_PRIO,
+    SORT_TOPOLOGICAL,
 } SortTarget;
 
 typedef struct {
@@ -65,7 +73,7 @@ typedef struct {
 } SortOptions;
 
 
-const char* status_to_str(const TaskStatus status)
+static const char* status_to_str(const TaskStatus status)
 {
     switch (status)
     {
@@ -76,7 +84,7 @@ const char* status_to_str(const TaskStatus status)
     }
 }
 
-void current_timestamp(char *buffer, const size_t buffer_size)
+static void current_timestamp(char *buffer, const size_t buffer_size)
 {
     const time_t t = time(NULL);
     assertmsg(t > -1, "Could not get time: %s\n", strerror(errno));
@@ -85,7 +93,7 @@ void current_timestamp(char *buffer, const size_t buffer_size)
     assertmsg(strftime(buffer, buffer_size, "%Y%m%d-%H%M%S", lt) > 0, "ERROR: could not format time!\n");
 }
 
-Task parse_task(char *id)
+static Task parse_task(char *id)
 {
     char path[BUFSIZE];
     snprintf(path, BUFSIZE, "./tasks/%s/TASK.md", id);
@@ -172,6 +180,23 @@ Task parse_task(char *id)
                 da_append(&task.tags, tag);
             }
         }
+        else if(sv_is_prefix(meta, "- REFERENCES"))
+        {
+            sv_chop(&meta, ':');
+            StringView trimmed = sv_trim(meta); 
+            if(trimmed.len == 0)
+            {
+                fprintf(stderr, "ERROR: Malformed \"REFERENCES\" header in %s\n", path);
+                exit(1);
+            }
+
+            StringView ref;
+            while((ref = sv_chop(&trimmed, ',')).len > 0)
+            {
+                ref = sv_trim(ref);
+                da_append(&task.refs, ref);
+            }
+        }
         else if(*meta.s == '-')
         {
             fprintf(stderr, "ERROR: Invalid task header \""SV_FMT"\" in %s\n", SV_ARG(meta), path);
@@ -186,7 +211,7 @@ Task parse_task(char *id)
     return task;
 }
 
-void create_task_folder(void)
+static void create_task_folder(void)
 {
     struct stat st;
     if (stat("./tasks", &st) == 0 && S_ISDIR(st.st_mode)) return;
@@ -200,14 +225,15 @@ void create_task_folder(void)
     }
 }
 
-void task_free(const Task task)
+static void task_free(const Task task)
 {
     free(task.id);
     da_free(&task.backing);
     da_free(&task.tags);
+    da_free(&task.refs);
 }
 
-void load_tasks(Tasks *tasks)
+static void load_tasks(Tasks *tasks)
 {
     DIR *dir = opendir("./tasks");
     if(!dir)
@@ -231,7 +257,7 @@ void load_tasks(Tasks *tasks)
     assertmsg(errno == 0, "ERROR: Could not properly read \"tasks\" folder: %s\n", strerror(errno));
 }
 
-bool task_contains_tag(const Task task, const char *tag)
+static bool task_contains_tag(const Task task, const char *tag)
 {
     const StringView tag_sv = sv_from_cstr(tag);
     da_foreach(StringView, sv, &task.tags)
@@ -245,7 +271,7 @@ bool task_contains_tag(const Task task, const char *tag)
     return false;
 }
 
-bool task_matches_filter(const Task task, const Ops *ops, Stack *stack)
+static bool task_matches_filter(const Task task, const Ops *ops, Stack *stack)
 {
     da_foreach(Op, op, ops)
     {
@@ -288,7 +314,7 @@ bool task_matches_filter(const Task task, const Ops *ops, Stack *stack)
     return *stack->items;
 }
 
-void filter_tasks(Tasks *tasks, const Ops *ops)
+static void filter_tasks(Tasks *tasks, const Ops *ops)
 {
     Stack stack = {0};
     for(size_t i = tasks->count; i > 0; --i)
@@ -303,7 +329,7 @@ void filter_tasks(Tasks *tasks, const Ops *ops)
     da_free(&stack);
 }
 
-void dump_tasks(const Tasks *tasks, bool all_tasks, bool verbose)
+static void dump_tasks(const Tasks *tasks, bool all_tasks, bool verbose)
 {
     da_foreach(Task, task, tasks)
     { 
@@ -331,6 +357,16 @@ void dump_tasks(const Tasks *tasks, bool all_tasks, bool verbose)
                 printf(", "SV_FMT, SV_ARG(task->tags.items[i]));
             } 
         }
+        // TODO validate references
+        if (task->refs.count > 0) 
+        {
+            printf(", REFERENCES: ");
+            printf(SV_FMT, SV_ARG(*task->refs.items));
+            for(size_t i = 1; i < task->refs.count; ++i)
+            {
+                printf(", "SV_FMT, SV_ARG(task->refs.items[i]));
+            } 
+        }
         assertmsg(task->title.len >= 2, "ERROR: malformed title\""SV_FMT"\"\n", SV_ARG(task->title));
         const StringView tmp_title = {.s = task->title.s + 2, .len = task->title.len - 2};
         printf("] "SV_FMT"\033[0m\n", SV_ARG(tmp_title));
@@ -342,8 +378,7 @@ void dump_tasks(const Tasks *tasks, bool all_tasks, bool verbose)
     }
 }
 
-
-void create_new_task(void)
+static void create_new_task(void)
 {
     char timestamp[128];
     current_timestamp(timestamp, sizeof timestamp);
@@ -384,6 +419,11 @@ void create_new_task(void)
     assertmsg(fgets(tags, sizeof tags, stdin) != NULL, "ERROR: Could not read tags\n");
     tags[strcspn(tags, "\n")] = 0;
 
+    char refs[BUFSIZE];
+    printf("References (optional, comma separated): ");
+    assertmsg(fgets(refs, sizeof refs, stdin) != NULL, "ERROR: Could not read refs\n");
+    refs[strcspn(refs, "\n")] = 0;
+
     create_task_folder();
     char path[BUFSIZE];
     const int offset = snprintf(path, BUFSIZE, "./tasks/%s/", timestamp);
@@ -401,13 +441,14 @@ void create_new_task(void)
     fprintf(fp, "- STATUS: %s\n", status);
     fprintf(fp, "- PRIORITY: %ld\n", prio);
     if(strlen(tags) > 0) fprintf(fp, "- TAGS: %s", tags);
+    if(strlen(refs) > 0) fprintf(fp, "- REFERENCES: %s", refs);
 
     fclose(fp);
 
     printf("INFO: Wrote \"%s\"\n", path);
 }
 
-void print_usage(const char *program)
+static void print_usage(const char *program)
 {
     printf("USAGE: %s <subcommand> [options]\n\n", program);
     printf("SUBCOMMANDS:\n");
@@ -421,6 +462,8 @@ void print_usage(const char *program)
     printf("    -D, --Date                 Sort by creation date (ascending)\n");
     printf("    -p, --priority             Sort by priority (descending, default)\n");
     printf("    -P, --Priority             Sort by priority (ascending)\n");
+    printf("    -r, --references           Sort refereces by topological ordering (descending)\n");
+    printf("    -R, --References           Sort refereces by topological ordering (ascending)\n");
     printf("    -f, --filter <query>       Filter tasks using a query string\n");
     printf("    -a, --all                  Display all tasks, even the closed ones\n");
     printf("    -v, --verbose              Display the whole task file\n");
@@ -431,12 +474,13 @@ void print_usage(const char *program)
     printf("    -s, --status <STATUS>      Set task status (OPEN, IN_PROGRESS, CLOSED)\n");
     printf("    -p, --priority <0-100>     Set task priority\n");
     printf("    -t, --tags <tags>          Overwrite task tags (comma-separated)\n");
+    printf("    -r, --references <refs>    Overwrite task references (comma-separated)\n");
     printf("                               Example: edit 20260328-085723 -s IN_PROGRESS -p 80\n");
 }
 
 static SortOptions sort_options = {.desc = true, .target = SORT_PRIO};
 
-int task_cmp(const void *a, const void *b)
+static int task_cmp(const void *a, const void *b)
 {
     const Task *task_a = (const Task *)a;
     const Task *task_b = (const Task *)b;
@@ -463,7 +507,68 @@ int task_cmp(const void *a, const void *b)
     }
 }
 
-int list_tasks(int argc, char **argv)
+static void sort_topological(Tasks *tasks)
+{
+    if(0 == tasks->count) return;
+
+    size_t n = tasks->count;
+    size_t *in_edges = calloc(n, sizeof(size_t));
+    assert(in_edges);
+
+    for(size_t i = 0; i < n; ++i)
+    {
+        in_edges[i] = tasks->items[i].refs.count;
+    }
+
+    Task *sorted = malloc(sizeof(Task) * n);
+    assert(sorted);
+    size_t *queue = malloc(sizeof(size_t) * n);
+    assert(queue);
+    size_t q_head = 0, q_tail = 0;
+
+    for (size_t i = 0; i < n; ++i) 
+    {
+        if (in_edges[i] == 0) queue[q_tail++] = i;
+    }
+
+    size_t sorted_count = sort_options.desc ? n - 1 : 0;
+    while(q_head < q_tail)
+    {
+        size_t cur_idx = queue[q_head++];
+        sorted[sorted_count] = tasks->items[cur_idx];
+        sorted_count += sort_options.desc ? -1 : 1;
+        StringView cur_id = sv_from_cstr(tasks->items[cur_idx].id);
+        for (size_t i = 0; i < n; ++i)
+        {
+            da_foreach(StringView, ref, &tasks->items[i].refs) 
+            {
+                if (sv_cmp(*ref, cur_id) == 0) 
+                {
+                    in_edges[i]--;
+                    if (in_edges[i] == 0) queue[q_tail++] = i;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (sorted_count < n) 
+    {
+        fprintf(stderr, "ERROR: reference cycle detected!\n");
+        free(sorted);
+        free(queue);
+        free(in_edges);
+        exit(1);
+    }
+
+    free(tasks->items);
+    tasks->items = sorted;
+
+    free(queue);
+    free(in_edges);
+}
+
+static int list_tasks(int argc, char **argv)
 {
     Tasks tasks = {0};
     load_tasks(&tasks);
@@ -509,6 +614,16 @@ int list_tasks(int argc, char **argv)
             sort_options.desc = false;
             sort_options.target = SORT_PRIO;
         }
+        else if(0 == strcmp("-r", flag) || 0 == strcmp("--references", flag))
+        {
+            sort_options.desc = true;
+            sort_options.target = SORT_TOPOLOGICAL;
+        }
+        else if(0 == strcmp("-R", flag) || 0 == strcmp("--References", flag))
+        {
+            sort_options.desc = false;
+            sort_options.target = SORT_TOPOLOGICAL;
+        }
         else if(0 == strcmp("-a", flag) || 0 == strcmp("--all", flag))
         {
             all_tasks = true;
@@ -524,7 +639,14 @@ int list_tasks(int argc, char **argv)
         }
     }
 
-    da_sort(&tasks, task_cmp);
+    if(sort_options.target != SORT_TOPOLOGICAL)
+    {
+        da_sort(&tasks, task_cmp);
+    }
+    else
+    {
+        sort_topological(&tasks);
+    }
     dump_tasks(&tasks, all_tasks, verbose);
 
 defer:
@@ -537,16 +659,16 @@ defer:
     return 0;
 }
 
-
-int edit_tasks(int argc, char **argv)
+static int edit_tasks(int argc, char **argv)
 {
     if (argc < 1) 
     {
         fprintf(stderr, "USAGE: tt edit <task-id> [options]\n");
         fprintf(stderr, "OPTIONS:\n");
-        fprintf(stderr, "    -s, --status <STATUS>    Set task status (OPEN, IN_PROGRESS, CLOSED)\n");
-        fprintf(stderr, "    -p, --priority <0-100>   Set task priority\n");
-        fprintf(stderr, "    -t, --tags <tags>        Overwrite task tags (comma-separated)\n");
+        fprintf(stderr, "    -s, --status <STATUS>           Set task status (OPEN, IN_PROGRESS, CLOSED)\n");
+        fprintf(stderr, "    -p, --priority <0-100>          Set task priority\n");
+        fprintf(stderr, "    -t, --tags <tags>               Overwrite task tags (comma-separated)\n");
+        fprintf(stderr, "    -r, --references <references>   Overwrite task references (comma-separated)\n");
         return 1;
     }
 
@@ -554,6 +676,7 @@ int edit_tasks(int argc, char **argv)
 
     const char *new_status = NULL;
     const char *new_tags   = NULL;
+    const char *new_refs   = NULL;
     long new_prio          = -1;
 
     while(argc > 0)
@@ -587,6 +710,11 @@ int edit_tasks(int argc, char **argv)
             assertmsg(argc > 0, "ERROR: tags flag required an argument");
             new_tags = shift_args(argc, argv);
         }
+        else if(0 == strcmp(flag, "-r") || 0 == strcmp(flag, "--references"))
+        {
+            assertmsg(argc > 0, "ERROR: references flag required an argument");
+            new_refs = shift_args(argc, argv);
+        }
         else
         {
             fprintf(stderr, "ERROR: Unknown edit option '%s'\n", flag);
@@ -594,9 +722,9 @@ int edit_tasks(int argc, char **argv)
         }
     }
 
-    if(!new_status && new_prio == -1 && !new_tags)
+    if(!new_status && new_prio == -1 && !new_tags && !new_refs)
     {
-        fprintf(stderr, "WARNING: Nothing to edit. Provide -s, -p, or -t flags.\n");
+        fprintf(stderr, "WARNING: Nothing to edit. Provide -s, -p, -t, or -r flags.\n");
         return 0;
     }
 

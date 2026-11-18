@@ -24,17 +24,20 @@ Creates new task interactively and put in the task folder
 Displays active (OPEN, IN\_PROGRESS) tasks. Running ./tt without arguments defaults to listing your tasks.
 ```text
 Options:
-    -d, --date      Sort by creation date (descending)
-    -D, --Date      Sort by creation date (ascending)
+    -d, --date         Sort by creation date (descending)
+    -D, --Date         Sort by creation date (ascending)
 
-    -p, --priority  Sort by priority (descending, default)
-    -P, --Priority  Sort by priority (ascending)
+    -p, --priority     Sort by priority (descending, default)
+    -P, --Priority     Sort by priority (ascending)
 
-    -f, --filter    Filter tasks using the Query Language
+    -r, --refereces    Sort refereces by topological ordering (descending)
+    -R, --Refereces    Sort refereces by topological ordering (ascending)
 
-    -a, --all       Display all tasks, even the closed ones
+    -f, --filter       Filter tasks using the Query Language
 
-    -v, --verbose   Display the whole task file
+    -a, --all          Display all tasks, even the closed ones
+
+    -v, --verbose      Display the whole task file
 ```    
 
 3. `edit`
