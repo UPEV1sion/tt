@@ -660,6 +660,23 @@ defer:
     return 0;
 }
 
+static void append_missing(StringBuilder *out, 
+        const char *tags, bool has_tags,
+        const char *refs, bool has_refs)
+{
+    char buf[BUFSIZE];
+    if(tags && *tags && !has_tags)
+    {
+        const int len = snprintf(buf, sizeof buf, "- TAGS: %s\n", tags);
+        da_append_many(out, buf, len);
+    }
+    if(refs && *refs && !has_refs)
+    {
+        const int len = snprintf(buf, sizeof buf, "- REFERENCES: %s\n", refs);
+        da_append_many(out, buf, len);
+    }
+}
+
 static int edit_tasks(int argc, char **argv)
 {
     if (argc < 1) 
@@ -739,11 +756,28 @@ static int edit_tasks(int argc, char **argv)
     StringBuilder output = {0};
     StringView line;
     bool has_tags = false;
+    bool has_refs = false;
     bool preamble_passed = false;
+    size_t line_no = 0;
 
     while((line = sv_chop(&sv, '\n')).len > 0 || sv.len > 0)
     {
-        if(sv_is_prefix(line, "- STATUS") && new_status)
+        line_no++;
+
+        if(preamble_passed || line_no <= 2)
+        {
+            da_append_many(&output, line.s, line.len);
+            da_append(&output, '\n');
+            continue;
+        }
+
+        if(0 == line.len)
+        {
+            preamble_passed = true;
+            append_missing(&output, new_tags, has_tags, new_refs, has_refs);
+            da_append(&output, '\n');
+        }
+        else if(sv_is_prefix(line, "- STATUS") && new_status)
         {
             char buf[128];
             const int len = snprintf(buf, sizeof(buf), "- STATUS: %s\n", new_status);
@@ -758,31 +792,32 @@ static int edit_tasks(int argc, char **argv)
         else if(sv_is_prefix(line, "- TAGS"))
         {
             has_tags = true;
-            if(new_tags)
-            {
-                char buf[BUFSIZE];
-                const int len = snprintf(buf, sizeof(buf), "- TAGS: %s\n", new_tags);
-                da_append_many(&output, buf, len);
-            }
-            else
+            if(!new_tags)
             {
                 da_append_many(&output, line.s, line.len);
                 da_append(&output, '\n');
             }
-        }
-        else if(line.len == 0 && !preamble_passed)
-        {
-            preamble_passed = true;
-
-            if(new_tags && !has_tags)
+            else if(*new_tags)
             {
                 char buf[BUFSIZE];
                 const int len = snprintf(buf, sizeof(buf), "- TAGS: %s\n", new_tags);
                 da_append_many(&output, buf, len);
-                has_tags = true;
             }
-
-            da_append(&output, '\n');
+        }
+        else if(sv_is_prefix(line, "- REFERENCES"))
+        {
+            has_refs = true;
+            if(!new_refs)
+            {
+                da_append_many(&output, line.s, line.len);
+                da_append(&output, '\n');
+            }
+            else if(*new_refs)
+            {
+                char buf[BUFSIZE];
+                const int len = snprintf(buf, sizeof(buf), "- REFERENCES: %s\n", new_refs);
+                da_append_many(&output, buf, len);
+            }
         }
         else
         {
@@ -790,6 +825,8 @@ static int edit_tasks(int argc, char **argv)
             da_append(&output, '\n');
         }
     }
+
+    if(!preamble_passed) append_missing(&output, new_tags, has_tags, new_refs, has_refs);
 
     FILE *fp = fopen(path, "w");
     assertmsg(fp != NULL, "ERROR: Could not write to file\n");
