@@ -10,8 +10,6 @@
 #include "parser.h"
 #include "da.h"
 #include "common.h"
-
-#define ARENA_IMPLEMENTATION
 #include "arena.h"
 
 typedef enum {

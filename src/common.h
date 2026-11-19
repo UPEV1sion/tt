@@ -5,6 +5,8 @@
 #ifndef COMMON_H_
 #define COMMON_H_
 
+#include <stdio.h>
+
 #define ARRAY_LEN(a)(sizeof(a)/sizeof(a[0]))
 #define assertmsg(cond, ...) \
     do { \

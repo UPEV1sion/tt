@@ -1,19 +1,41 @@
 CC := gcc
-CFLAGS := -Wall -Wextra -pedantic -O3
+CFLAGS := -Wall -Wextra -pedantic -ggdb
+CPPFLAGS := -MMD -MP
 
 SRC := src/main.c src/parser.c
-TEST_BIN := tests/integration/tt_test
 DESTDIR := build
+TARGET   := tt
 
-tt: $(SRC)
+SRC      := src/main.c src/parser.c
+HDR_MODS := da ht arena
+C_OBJS   := $(patsubst src/%.c,$(DESTDIR)/%.o,$(SRC))
+H_OBJS   := $(patsubst %,$(DESTDIR)/%.o,$(HDR_MODS))
+OBJS     := $(H_OBJS) $(C_OBJS)
+DEPS     := $(OBJS:.o=.d)
+
+.PHONY: all install clean
+
+all: $(TARGET)
+
+$(DESTDIR):
+	mkdir -p $@
+
+$(DESTDIR)/da.o: src/da.h | $(DESTDIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -xc -c -DDA_IMPLEMENTATION -o $@ $<
+
+$(DESTDIR)/ht.o: src/ht.h | $(DESTDIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -xc -c -DHT_IMPLEMENTATION -o $@ $< 
+
+$(DESTDIR)/arena.o: src/arena.h | $(DESTDIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -xc -c -DARENA_IMPLEMENTATION -o $@ $<
+
+$(DESTDIR)/%.o: src/%.c | $(DESTDIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
+
+$(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) $^ -o $@
 
-$(TEST_BIN): $(SRC)
-	@mkdir -p tests/integration
-	$(CC) $(CFLAGS) $^ -o $@
-
-test: $(TEST_BIN)
-	pytest -v
+-include $(DEPS)
 
 install:
 	mkdir -p $(DESTDIR)/bin

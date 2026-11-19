@@ -7,6 +7,7 @@
 
 #include <string.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <ctype.h>
 
 #include "common.h"
@@ -46,8 +47,8 @@ typedef struct {
 
 #define da_append_many(da, item, sz) \
     do { \
-        da_reserve((da), (da)->count + sz); \
-        memcpy((da)->items + (da)->count, (item), sz); \
+        da_reserve((da), (da)->count + (sz)); \
+        memcpy((da)->items + (da)->count, (item), (sz)); \
         (da)->count += sz; \
      } while(0) 
 

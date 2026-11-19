@@ -8,12 +8,13 @@
 #include <ctype.h>
 #include <string.h>
 #include <dirent.h>
+#include <stddef.h>
 #include <assert.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <sys/stat.h>
 
-#define DA_IMPLEMENTATION
+#include "ht.h"
 #include "da.h"
 #include "parser.h"
 #include "common.h"
@@ -427,13 +428,14 @@ static void create_new_task(void)
     create_task_folder();
     char path[BUFSIZE];
     const int offset = snprintf(path, BUFSIZE, "./tasks/%s/", timestamp);
+    assert(offset >= 0);
     if(mkdir(path, 0755) != 0)
     {
         fprintf(stderr, "ERROR: Could not create \"%s\" folder: %s\n", path, strerror(errno));
         exit(1);
     }
     
-    snprintf(path + offset, BUFSIZE - offset, "TASK.md"); 
+    snprintf(path + offset, BUFSIZE - (size_t) offset, "TASK.md"); 
     FILE *fp;
     assertmsg((fp = fopen(path, "w")) != NULL, "ERROR: Could not open \"%s\" for writing\n", path);
 
@@ -509,64 +511,89 @@ static int task_cmp(const void *a, const void *b)
 
 static void sort_topological(Tasks *tasks)
 {
+    typedef struct {
+        size_t count;
+        size_t capacity;
+        size_t *items;
+    } AdjList;
+
     if(0 == tasks->count) return;
 
     size_t n = tasks->count;
-    size_t *in_edges = calloc(n, sizeof(size_t));
-    assert(in_edges);
+    HashTable id_to_idx = {0};
 
     for(size_t i = 0; i < n; ++i)
     {
-        in_edges[i] = tasks->items[i].refs.count;
+        StringView id_sv = sv_from_cstr(tasks->items[i].id);
+        assertmsg(ht_insert(&id_to_idx, id_sv, i) == 0, "ERROR: duplicate or failed task ID insert: %s\n", tasks->items[i].id);
     }
 
-    Task *sorted = malloc(sizeof(Task) * n);
-    assert(sorted);
+    size_t *in_edges = calloc(n, sizeof(size_t));
+    AdjList *dependents = calloc(n, sizeof(AdjList));
     size_t *queue = malloc(sizeof(size_t) * n);
-    assert(queue);
-    size_t q_head = 0, q_tail = 0;
+    Task *sorted = malloc(sizeof(Task) * n);
+    assertmsg(in_edges && dependents && queue && sorted, "ERROR: out of memory\n");
 
-    for (size_t i = 0; i < n; ++i) 
+    for (size_t i = 0; i < n; ++i)
+    {
+        in_edges[i] = tasks->items[i].refs.count;
+        da_foreach(StringView, ref, &tasks->items[i].refs)
+        {
+            size_t target_idx = 0;
+            if (ht_lookup(&id_to_idx, *ref, &target_idx) != 0)
+            {
+                fprintf(stderr, "ERROR: task '%s' references unknown task '"SV_FMT"'\n",
+                        tasks->items[i].id, SV_ARG(*ref));
+                goto err;
+            }
+            da_append(&dependents[target_idx], i);
+        }
+    }
+
+    size_t q_head = 0, q_tail = 0;
+    for (size_t i = 0; i < n; ++i)
     {
         if (in_edges[i] == 0) queue[q_tail++] = i;
     }
 
-    size_t sorted_count = sort_options.desc ? 0 : n - 1;
-    while(q_head < q_tail)
+
+    size_t placed = 0;
+    ssize_t write_idx = sort_options.desc ? 0 : (ssize_t)n - 1;
+    const ssize_t step = sort_options.desc ? 1 : -1;
+
+    while (q_head < q_tail)
     {
-        size_t cur_idx = queue[q_head++];
-        sorted[sorted_count] = tasks->items[cur_idx];
-        sorted_count += sort_options.desc ? 1 : -1;
-        StringView cur_id = sv_from_cstr(tasks->items[cur_idx].id);
-        // TODO more efficient lookup and id validation
-        for (size_t i = 0; i < n; ++i)
+        const size_t cur_idx = queue[q_head++];
+        sorted[write_idx] = tasks->items[cur_idx];
+        write_idx += step;
+        placed++;
+
+        da_foreach(size_t, dep_idx, &dependents[cur_idx])
         {
-            da_foreach(StringView, ref, &tasks->items[i].refs) 
+            if (--in_edges[*dep_idx] == 0)
             {
-                if (sv_cmp(*ref, cur_id) == 0) 
-                {
-                    in_edges[i]--;
-                    if (in_edges[i] == 0) queue[q_tail++] = i;
-                    break;
-                }
+                queue[q_tail++] = *dep_idx;
             }
         }
     }
 
-    if (sorted_count < n) 
-    {
-        fprintf(stderr, "ERROR: reference cycle detected!\n");
-        free(sorted);
-        free(queue);
-        free(in_edges);
-        exit(1);
-    }
-
-    free(tasks->items);
-    tasks->items = sorted;
-
+    for (size_t k = 0; k < n; ++k) da_free(&dependents[k]);
+    free(dependents);
     free(queue);
     free(in_edges);
+    ht_free(&id_to_idx);
+
+    tasks->items = sorted;
+    return;
+
+err:
+    for (size_t k = 0; k < n; ++k) da_free(&dependents[k]);
+    free(dependents);
+    free(sorted);
+    free(queue);
+    free(in_edges);
+    ht_free(&id_to_idx);
+    exit(1);
 }
 
 static int list_tasks(int argc, char **argv)
@@ -668,12 +695,14 @@ static void append_missing(StringBuilder *out,
     if(tags && *tags && !has_tags)
     {
         const int len = snprintf(buf, sizeof buf, "- TAGS: %s\n", tags);
-        da_append_many(out, buf, len);
+        assert(len >= 0);
+        da_append_many(out, buf, (size_t) len);
     }
     if(refs && *refs && !has_refs)
     {
         const int len = snprintf(buf, sizeof buf, "- REFERENCES: %s\n", refs);
-        da_append_many(out, buf, len);
+        assert(len >= 0);
+        da_append_many(out, buf, (size_t) len);
     }
 }
 
@@ -781,13 +810,15 @@ static int edit_tasks(int argc, char **argv)
         {
             char buf[128];
             const int len = snprintf(buf, sizeof(buf), "- STATUS: %s\n", new_status);
-            da_append_many(&output, buf, len);
+            assert(len >= 0);
+            da_append_many(&output, buf, (size_t) len);
         }
         else if(sv_is_prefix(line, "- PRIORITY") && new_prio != -1)
         {
             char buf[128];
             const int len = snprintf(buf, sizeof(buf), "- PRIORITY: %ld\n", new_prio);
-            da_append_many(&output, buf, len);
+            assert(len >= 0);
+            da_append_many(&output, buf, (size_t) len);
         }
         else if(sv_is_prefix(line, "- TAGS"))
         {
@@ -801,7 +832,8 @@ static int edit_tasks(int argc, char **argv)
             {
                 char buf[BUFSIZE];
                 const int len = snprintf(buf, sizeof(buf), "- TAGS: %s\n", new_tags);
-                da_append_many(&output, buf, len);
+                assert(len >= 0);
+                da_append_many(&output, buf, (size_t) len);
             }
         }
         else if(sv_is_prefix(line, "- REFERENCES"))
@@ -816,7 +848,8 @@ static int edit_tasks(int argc, char **argv)
             {
                 char buf[BUFSIZE];
                 const int len = snprintf(buf, sizeof(buf), "- REFERENCES: %s\n", new_refs);
-                da_append_many(&output, buf, len);
+                assert(len >= 0);
+                da_append_many(&output, buf, (size_t) len);
             }
         }
         else

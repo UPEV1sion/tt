@@ -28,6 +28,7 @@
           gnumake
           gcc
           clang
+          python3
         ]; 
       };
     }
