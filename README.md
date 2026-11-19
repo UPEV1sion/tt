@@ -30,8 +30,8 @@ Options:
     -p, --priority     Sort by priority (descending, default)
     -P, --Priority     Sort by priority (ascending)
 
-    -r, --refereces    Sort refereces by topological ordering (descending)
-    -R, --Refereces    Sort refereces by topological ordering (ascending)
+    -r, --references   Sort refereces by topological ordering (descending)
+    -R, --References   Sort refereces by topological ordering (ascending)
 
     -f, --filter       Filter tasks using the Query Language
 
@@ -45,9 +45,10 @@ Options:
 Modifies an existing task's file metadata without affecting any commentary text below the preamble.
 ```text
 Options:
-    -s, --status    Set task status (OPEN, IN_PROGRESS, CLOSED)
-    -p, --priority  Set task priority (0-100)
-    -t, --tags      Overwrite task tags (comma-separated)
+    -s, --status       Set task status (OPEN, IN_PROGRESS, CLOSED)
+    -p, --priority     Set task priority (0-100)
+    -t, --tags         Overwrite task tags (comma-separated)
+    -r, --references   Overwrite task references (comma-separated)
 ```
 
 ## Filter syntax
