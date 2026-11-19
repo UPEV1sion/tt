@@ -91,6 +91,10 @@ _TAGS_
 - Must be prefixed with `.`with filtering
 - Used with the `-f` option for querying tasks
 
+_REFERENCES_
+
+- Task-ID of other tasks
+- Should not form a cycle
 
 After that a markdown file will be created in a folder with a timestamp (e.g. `tasks/20260328-085723/TASK.md`) with the exemplary preamble:
 ```markdown
@@ -99,6 +103,7 @@ After that a markdown file will be created in a folder with a timestamp (e.g. `t
 - STATUS: OPEN
 - PRIORITY: 20
 - TAGS: feature, cli
+- REFERENCES: 20260328-085723
 ```
 
 The user can add arbitrary files into the created folder and write additional information _after_ the preamble.
