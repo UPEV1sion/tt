@@ -496,11 +496,11 @@ static int task_cmp(const void *a, const void *b)
         case SORT_TIMESTAMP: {
             if (sort_options.desc)
             {
-                return strcmp(task_a->id, task_b->id);
+                return strcmp(task_b->id, task_a->id);
             }
             else
             {
-                return strcmp(task_b->id, task_a->id);
+                return strcmp(task_a->id, task_b->id);
             }
         } break;
         default: assertmsg(false, "UNREACHABLE");
@@ -531,12 +531,12 @@ static void sort_topological(Tasks *tasks)
         if (in_edges[i] == 0) queue[q_tail++] = i;
     }
 
-    size_t sorted_count = sort_options.desc ? n - 1 : 0;
+    size_t sorted_count = sort_options.desc ? 0 : n - 1;
     while(q_head < q_tail)
     {
         size_t cur_idx = queue[q_head++];
         sorted[sorted_count] = tasks->items[cur_idx];
-        sorted_count += sort_options.desc ? -1 : 1;
+        sorted_count += sort_options.desc ? 1 : -1;
         StringView cur_id = sv_from_cstr(tasks->items[cur_idx].id);
         // TODO more efficient lookup and id validation
         for (size_t i = 0; i < n; ++i)

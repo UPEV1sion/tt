@@ -76,6 +76,11 @@ static void lexer_trim_left(Lexer *lexer)
     }
 }
 
+static bool is_tag_char(const int c)
+{
+    return isalnum((unsigned char) c) || c == '_' || c == '-';
+}
+
 static Token lexer_next_tok(Lexer *lexer)
 {
     lexer_trim_left(lexer);
@@ -103,7 +108,7 @@ static Token lexer_next_tok(Lexer *lexer)
                 size_t pos = 0;
                 char buffer[BUFSIZE];
 
-                while(isalnum((unsigned char) lexer->cur_char) && pos < BUFSIZE - 1)
+                while(is_tag_char(lexer->cur_char) && pos < BUFSIZE - 1)
                 {
                     buffer[pos++] = (unsigned char) lexer->cur_char;
                     lexer_advance(lexer);
@@ -122,7 +127,7 @@ static Token lexer_next_tok(Lexer *lexer)
                 {
                     buffer[pos++] = (unsigned char) lexer->cur_char;
                     lexer_advance(lexer);
-                } while(isalnum(lexer->cur_char) && pos < BUFSIZE - 1);
+                } while(is_tag_char(lexer->cur_char) && pos < BUFSIZE - 1);
 
                 buffer[pos] = 0;
 
@@ -215,6 +220,17 @@ char* op_to_str(const Op op)
     }
 }
 
+static void token_text(const Token t, char *buf, const size_t size)
+{
+    switch(t.type)
+    {
+        case TOK_LPAREN: snprintf(buf, size, "(");               break;
+        case TOK_RPAREN: snprintf(buf, size, ")");               break;
+        case TOK_TAG:    snprintf(buf, size, ".%s", t.lexeme);   break;
+        default:         snprintf(buf, size, "%s", t.lexeme ? t.lexeme : "?"); break;
+    }
+}
+
 #define error(input, caret_pos, ...) \
     do { \
         fprintf(stderr, __VA_ARGS__); \
@@ -231,9 +247,15 @@ static void parse_primary(Lexer *lexer, Ops *ops)
 {
     if(match(lexer, TOK_ID))
     {
-        const Op op = op_new(OP_ID, lexer->last_tok.lexeme);
-        da_append(ops, op);
-        return;
+        const Token id = lexer->last_tok;
+        error(lexer->input, id.pos,
+          "ERROR: unknown identifier \"%s\". Tags need a '.' prefix, did you mean \".%s\"?\n", 
+          id.lexeme, 
+          id.lexeme
+        );
+        // const Op op = op_new(OP_ID, lexer->last_tok.lexeme);
+        // da_append(ops, op);
+        // return;
     }
 
     if(match(lexer, TOK_TAG))
@@ -322,8 +344,9 @@ void parse_expr(Lexer *lexer, Ops *ops)
     parse_or(lexer, ops);
     if (!is_end(lexer->cur_tok))
     {
-        error(lexer->input, lexer->cur_tok.pos, "ERROR: unexpected token \"%s%s\" at end of expression\n", 
-                (lexer->cur_tok.type == TOK_TAG) ? "." : "",
-                lexer->cur_tok.lexeme);
+        const Token t = lexer->cur_tok;
+        char text[BUFSIZE + 2];
+        token_text(t, text, sizeof text);
+        error(lexer->input, t.pos, "ERROR: unexpected token \"%s\" at end of expression\n", text);
     }
 }
