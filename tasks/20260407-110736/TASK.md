@@ -1,6 +1,6 @@
 # Remove sleep in pytest
 
-- STATUS: OPEN
+- STATUS: CLOSED
 - PRIORITY: 20
 - TAGS: test
 
