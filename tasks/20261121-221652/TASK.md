@@ -1,5 +1,5 @@
 # New Test System
 
-- STATUS: IN_PROGRESS
+- STATUS: CLOSED
 - PRIORITY: 100
 - TAGS: test
