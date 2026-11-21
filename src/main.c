@@ -892,8 +892,7 @@ int main(int argc, char **argv)
     const char *program = shift_args(argc, argv);
     if(0 == argc)
     {
-        list_tasks(argc, argv);
-        return 0;
+        return list_tasks(argc, argv);
     }
 
     const char *subcommand = shift_args(argc, argv);
@@ -904,11 +903,11 @@ int main(int argc, char **argv)
     }
     else if(0 == strcmp(subcommand, "list"))
     {
-        list_tasks(argc, argv); 
+        return list_tasks(argc, argv); 
     }
     else if(0 == strcmp(subcommand, "edit"))
     {
-        edit_tasks(argc, argv);
+        return edit_tasks(argc, argv);
     }
     else if(0 == strcmp(subcommand, "help"))
     {

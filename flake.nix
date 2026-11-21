@@ -7,20 +7,36 @@
   };
 
   outputs = { self, nixpkgs, flake-utils, ... }:
-  flake-utils.lib.eachDefaultSystem (system: 
-    let 
+  flake-utils.lib.eachDefaultSystem (system:
+    let
       pkgs = import nixpkgs { inherit system; };
+      srcFiles = pkgs.lib.fileset.toSource {
+        root = ./.;
+        fileset = pkgs.lib.fileset.unions [
+          ./Makefile
+          ./src
+          ./tests
+        ];
+      };
     in {
       packages.default = pkgs.stdenv.mkDerivation {
         pname = "task-tracker";
         version = "0.1.0";
-        src = ./.;
+        src = srcFiles;
         dontConfigure = true;
-        installFlags = [ "DESTDIR=$(out)" ];
+
         nativeBuildInputs = with pkgs; [
           gnumake
           gcc
         ];
+
+        doCheck = true;
+        nativeCheckInputs = with pkgs; [
+          valgrind
+          (python3.withPackages (p: [ p.pytest ]))
+        ];
+
+        installFlags = [ "DESTDIR=$(out)" ];
       };
 
       devShells.default = pkgs.mkShell {
@@ -28,8 +44,9 @@
           gnumake
           gcc
           clang
-          python3
-        ]; 
+          (python3.withPackages (p: [ p.pytest ]))
+          valgrind
+        ];
       };
     }
   );

@@ -12,9 +12,9 @@ H_OBJS   := $(patsubst %,$(DESTDIR)/%.o,$(HDR_MODS))
 OBJS     := $(H_OBJS) $(C_OBJS)
 DEPS     := $(OBJS:.o=.d)
 
-.PHONY: all install clean
+.PHONY: all install clean test
 
-all: $(TARGET)
+all: $(TARGET) test
 
 $(DESTDIR):
 	mkdir -p $@
@@ -35,6 +35,9 @@ $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) $^ -o $@
 
 -include $(DEPS)
+
+test:
+	pytest ./tests
 
 install:
 	mkdir -p $(DESTDIR)/bin
