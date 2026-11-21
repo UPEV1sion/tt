@@ -108,7 +108,7 @@ static Token lexer_next_tok(Lexer *lexer)
 
                 while(is_tag_char(lexer->cur_char) && pos < BUFSIZE - 1)
                 {
-                    buffer[pos++] = (unsigned char) lexer->cur_char;
+                    buffer[pos++] = (char) lexer->cur_char;
                     lexer_advance(lexer);
                 }
 
@@ -123,7 +123,7 @@ static Token lexer_next_tok(Lexer *lexer)
 
                 do
                 {
-                    buffer[pos++] = (unsigned char) lexer->cur_char;
+                    buffer[pos++] = (char) lexer->cur_char;
                     lexer_advance(lexer);
                 } while(is_tag_char(lexer->cur_char) && pos < BUFSIZE - 1);
 

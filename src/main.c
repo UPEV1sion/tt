@@ -248,8 +248,21 @@ static void load_tasks(Tasks *tasks)
     {
         if (0 == strcmp(dir_entry->d_name, ".") || 0 == strcmp(dir_entry->d_name, "..")) continue;
 
-        assertmsg(dir_entry->d_type == DT_DIR, 
-                "ERROR: malformed \"tasks\" folder. Please remove \"./tasks/%s\"!\n", dir_entry->d_name);
+        char path[BUFSIZE];
+        snprintf(path, sizeof(path), "./tasks/%s", dir_entry->d_name);
+        struct stat sb;
+        if(stat(path, &sb) != 0)
+        {
+            fprintf(stderr, "ERROR: could not stat %s: %s. Continuing...\n", path, strerror(errno));
+            continue; 
+        }
+
+        if(!S_ISDIR(sb.st_mode))
+        {
+            fprintf(stderr, "ERROR: malformed \"tasks\" folder. Please remove \"./tasks/%s\"! Continuing...\n", dir_entry->d_name);
+            continue;
+        }
+
         const Task task = parse_task(strdup(dir_entry->d_name));
         da_append(tasks, task);
     }
