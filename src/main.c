@@ -461,11 +461,9 @@ static void print_usage(const char *program)
     
     printf("OPTIONS FOR \"list\":\n");
     printf("    -d, --date                 Sort by creation date (descending)\n");
-    printf("    -D, --Date                 Sort by creation date (ascending)\n");
     printf("    -p, --priority             Sort by priority (descending, default)\n");
-    printf("    -P, --Priority             Sort by priority (ascending)\n");
-    printf("    -r, --references           Sort refereces by topological ordering (descending)\n");
-    printf("    -R, --References           Sort refereces by topological ordering (ascending)\n");
+    printf("    -t, --topological          Sort refereces by topological ordering (descending)\n");
+    printf("    -r, --reverse              Reverse the sorting order (ascending)\n");
     printf("    -f, --filter <query>       Filter tasks using a query string\n");
     printf("    -a, --all                  Display all tasks, even the closed ones\n");
     printf("    -v, --verbose              Display the whole task file\n");
@@ -603,6 +601,8 @@ static int list_tasks(int argc, char **argv)
     bool all_tasks = false;
     bool verbose = false;
 
+    // TODO help flag for list
+    // TODO maybe convert this to getopt, to allow for something like -dr
     while(argc > 0)
     {
         const char *flag = shift_args(argc, argv);
@@ -612,9 +612,11 @@ static int list_tasks(int argc, char **argv)
             assertmsg(argc >= 0, "ERROR: no filter provided!\n");
             Lexer *lexer = lexer_new(filter);
             if (!lexer) goto defer;
+
             Ops ops = {0};
             parse_expr(lexer, &ops);
             filter_tasks(&tasks, &ops);
+
             da_foreach(Op, op, &ops)
             {
                 free(op->lexeme);
@@ -624,33 +626,19 @@ static int list_tasks(int argc, char **argv)
         }
         else if(0 == strcmp("-d", flag) || 0 == strcmp("--date", flag))
         {
-            sort_options.desc = true;
-            sort_options.target = SORT_TIMESTAMP;
-        }
-        else if(0 == strcmp("-D", flag) || 0 == strcmp("--Date", flag))
-        {
-            sort_options.desc = false;
             sort_options.target = SORT_TIMESTAMP;
         }
         else if(0 == strcmp("-p", flag) || 0 == strcmp("--priority", flag))
         {
-            sort_options.desc = true;
             sort_options.target = SORT_PRIO;
         }
-        else if(0 == strcmp("-P", flag) || 0 == strcmp("--Priority", flag))
+        else if(0 == strcmp("-t", flag) || 0 == strcmp("--topological", flag))
         {
-            sort_options.desc = false;
-            sort_options.target = SORT_PRIO;
-        }
-        else if(0 == strcmp("-r", flag) || 0 == strcmp("--references", flag))
-        {
-            sort_options.desc = true;
             sort_options.target = SORT_TOPOLOGICAL;
         }
-        else if(0 == strcmp("-R", flag) || 0 == strcmp("--References", flag))
+        else if(0 == strcmp("-r", flag) || 0 == strcmp("--reverse", flag))
         {
             sort_options.desc = false;
-            sort_options.target = SORT_TOPOLOGICAL;
         }
         else if(0 == strcmp("-a", flag) || 0 == strcmp("--all", flag))
         {

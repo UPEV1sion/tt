@@ -1,12 +1,11 @@
-CC := gcc
-CFLAGS := -Wall -Wextra -pedantic -ggdb
+CC       := gcc
+CFLAGS   := -Wall -Wextra -pedantic -ggdb
 CPPFLAGS := -MMD -MP
 
-SRC := src/main.c src/parser.c
-DESTDIR := build
+DESTDIR  := build
 TARGET   := tt
 
-SRC      := src/main.c src/parser.c
+SRC      := src/main.c src/parser.c src/flag.c
 HDR_MODS := da ht arena
 C_OBJS   := $(patsubst src/%.c,$(DESTDIR)/%.o,$(SRC))
 H_OBJS   := $(patsubst %,$(DESTDIR)/%.o,$(HDR_MODS))

@@ -25,13 +25,12 @@ Displays active (OPEN, IN\_PROGRESS) tasks. Running ./tt without arguments defau
 ```text
 Options:
     -d, --date         Sort by creation date (descending)
-    -D, --Date         Sort by creation date (ascending)
 
     -p, --priority     Sort by priority (descending, default)
-    -P, --Priority     Sort by priority (ascending)
 
-    -r, --references   Sort refereces by topological ordering (descending)
-    -R, --References   Sort refereces by topological ordering (ascending)
+    -t, --topological  Sort refereces by topological ordering (descending)
+
+    -r, --reverse      Reverse the sorting order (ascending)
 
     -f, --filter       Filter tasks using the Query Language
 
