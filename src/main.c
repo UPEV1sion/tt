@@ -638,6 +638,7 @@ static int list_tasks(int argc, char **argv)
         flag_print_info(&flags, "LIST FLAGS");
         return 1;
     }
+    flag_free(&flags);
     // clang-format on
 
     if (help)

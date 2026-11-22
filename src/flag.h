@@ -455,7 +455,7 @@ FLAGDEF int flag_parse(Flags *flags, int argc, char **argv)
             continue;
         }
 
-        for (size_t i = 0; i < flag_len; ++i)
+        for (size_t i = 1; i < flag_len; ++i)
         {
             const char c = flag[i];
             Flag *f      = short_flags[(unsigned char)c];
