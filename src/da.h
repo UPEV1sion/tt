@@ -77,11 +77,7 @@ typedef struct {
         (da)->items[idx] = (da)->items[--(da)->count];                \
     } while (0)
 
-#define da_free(da)        \
-    do                     \
-    {                      \
-        free((da)->items); \
-    } while (0)
+#define da_free(da) free((da)->items)
 
 #ifndef DA_DEF
 #define DA_DEF

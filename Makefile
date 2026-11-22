@@ -5,8 +5,8 @@ CPPFLAGS := -MMD -MP
 DESTDIR  := build
 TARGET   := tt
 
-SRC      := src/main.c src/parser.c src/flag.c
-HDR_MODS := da ht arena
+SRC      := src/main.c src/parser.c
+HDR_MODS := da ht arena flag
 C_OBJS   := $(patsubst src/%.c,$(DESTDIR)/%.o,$(SRC))
 H_OBJS   := $(patsubst %,$(DESTDIR)/%.o,$(HDR_MODS))
 OBJS     := $(H_OBJS) $(C_OBJS)
@@ -27,6 +27,9 @@ $(DESTDIR)/ht.o: src/ht.h | $(DESTDIR)
 
 $(DESTDIR)/arena.o: src/arena.h | $(DESTDIR)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -xc -c -DARENA_IMPLEMENTATION -o $@ $<
+
+$(DESTDIR)/flag.o: src/flag.h | $(DESTDIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -xc -c -DFLAG_IMPLEMENTATION -o $@ $<
 
 $(DESTDIR)/%.o: src/%.c | $(DESTDIR)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<

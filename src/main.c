@@ -16,6 +16,7 @@
 
 #include "common.h"
 #include "da.h"
+#include "flag.h"
 #include "ht.h"
 #include "parser.h"
 
