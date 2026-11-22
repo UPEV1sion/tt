@@ -7,15 +7,16 @@
 
 #include <stdio.h>
 
-#define ARRAY_LEN(a)(sizeof(a)/sizeof(a[0]))
-#define assertmsg(cond, ...) \
-    do { \
-        if(!(cond)) \
-        { \
+#define ARRAY_LEN(a) (sizeof(a) / sizeof(a[0]))
+#define assertmsg(cond, ...)              \
+    do                                    \
+    {                                     \
+        if (!(cond))                      \
+        {                                 \
             fprintf(stderr, __VA_ARGS__); \
-            exit(1); \
-        } \
-    } while(0)
+            exit(1);                      \
+        }                                 \
+    } while (0)
 
 #define BUFSIZE 1024
 

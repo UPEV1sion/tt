@@ -9,7 +9,7 @@
 
 typedef struct HT__Bucket HT__Bucket;
 struct HT__Bucket {
-    HT__Bucket *next;    
+    HT__Bucket *next;
     StringView key;
     size_t val;
 };
@@ -27,14 +27,14 @@ void ht_free(HashTable *ht);
 
 #ifdef HT_IMPLEMENTATION
 
-HT__Bucket* ht__new_bucket(StringView key, size_t val)
+HT__Bucket *ht__new_bucket(StringView key, size_t val)
 {
     HT__Bucket *b = malloc(sizeof(*b));
-    if(!b) return NULL;
+    if (!b) return NULL;
 
     b->next = NULL;
-    b->key = key;
-    b->val = val;
+    b->key  = key;
+    b->val  = val;
 
     return b;
 }
@@ -47,11 +47,11 @@ void ht__bucket_free(HT__Bucket *b)
 uint64_t ht__hash(StringView key)
 {
     const uint64_t magic_prime = 0x00000100000001b3;
-    uint64_t hash = 0xcbf29ce484222325;
+    uint64_t hash              = 0xcbf29ce484222325;
 
-    for(size_t i = 0; i < key.len; ++i)
+    for (size_t i = 0; i < key.len; ++i)
     {
-        hash = (hash ^ (unsigned char) key.s[i]) * magic_prime;
+        hash = (hash ^ (unsigned char)key.s[i]) * magic_prime;
     }
 
     return hash;
@@ -61,20 +61,19 @@ int ht_insert(HashTable *ht, StringView key, size_t val)
 {
     assert(ht);
     // TODO resize
-    if(0 == ht->capacity)
+    if (0 == ht->capacity)
     {
         ht->capacity = 1024;
-        ht->items = calloc(ht->capacity, sizeof(*ht->items));
-        if(!ht->items) return 1;
+        ht->items    = calloc(ht->capacity, sizeof(*ht->items));
+        if (!ht->items) return 1;
     }
-
 
     const uint64_t hash = ht__hash(key) % ht->capacity;
 
     HT__Bucket *prev = NULL;
-    for(HT__Bucket *b = ht->items[hash]; b; b = b->next)
+    for (HT__Bucket *b = ht->items[hash]; b; b = b->next)
     {
-        if(sv_cmp(b->key, key) == 0)
+        if (sv_cmp(b->key, key) == 0)
         {
             b->val = val;
             return 0;
@@ -83,9 +82,9 @@ int ht_insert(HashTable *ht, StringView key, size_t val)
     }
 
     HT__Bucket *b = ht__new_bucket(key, val);
-    if(!b) return 1;
+    if (!b) return 1;
 
-    if(prev)
+    if (prev)
     {
         prev->next = b;
     }
@@ -102,13 +101,13 @@ int ht_lookup(HashTable *ht, StringView key, size_t *val)
 {
     assert(ht);
     assert(val);
-    if(0 == ht->capacity) return 1;
+    if (0 == ht->capacity) return 1;
 
     const uint64_t hash = ht__hash(key) % ht->capacity;
 
-    for(HT__Bucket *b = ht->items[hash]; b; b = b->next)
+    for (HT__Bucket *b = ht->items[hash]; b; b = b->next)
     {
-        if(sv_cmp(b->key, key) == 0)
+        if (sv_cmp(b->key, key) == 0)
         {
             *val = b->val;
             return 0;
@@ -121,16 +120,16 @@ int ht_lookup(HashTable *ht, StringView key, size_t *val)
 int ht_remove(HashTable *ht, StringView key)
 {
     assert(ht);
-    if(0 == ht->capacity) return 1;
+    if (0 == ht->capacity) return 1;
 
     const uint64_t hash = ht__hash(key) % ht->capacity;
 
     HT__Bucket *prev = NULL;
-    for(HT__Bucket *b = ht->items[hash]; b; b = b->next)
+    for (HT__Bucket *b = ht->items[hash]; b; b = b->next)
     {
-        if(sv_cmp(b->key, key) == 0)
+        if (sv_cmp(b->key, key) == 0)
         {
-            if(prev)
+            if (prev)
             {
                 prev->next = b->next;
             }
@@ -154,10 +153,10 @@ void ht_free(HashTable *ht)
     // TODO this could benefit from an arena?
     assert(ht);
 
-    for(size_t i = 0; i < ht->capacity; ++i)
+    for (size_t i = 0; i < ht->capacity; ++i)
     {
         HT__Bucket *b = ht->items[i];
-        while(b)
+        while (b)
         {
             HT__Bucket *n = b->next;
             ht__bucket_free(b);

@@ -12,7 +12,7 @@ H_OBJS   := $(patsubst %,$(DESTDIR)/%.o,$(HDR_MODS))
 OBJS     := $(H_OBJS) $(C_OBJS)
 DEPS     := $(OBJS:.o=.d)
 
-.PHONY: all install clean
+.PHONY: all install clean fmt
 
 all: $(TARGET)
 
@@ -35,6 +35,9 @@ $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) $^ -o $@
 
 -include $(DEPS)
+
+fmt:
+	git ls-files '*.c' '*.h' | xargs clang-format -i
 
 install:
 	mkdir -p $(DESTDIR)/bin
