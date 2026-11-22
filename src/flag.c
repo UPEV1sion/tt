@@ -2,10 +2,9 @@
 #include <string.h>
 
 #include "flag.h"
-// #include "ht.h"
 
 #define ALPHABET_SIZE 256
-#define shift_args(argc, argv)((argv)--, *(argv)++)
+#define shift_args(argc, argv)((argc)--, *(argv)++)
 
 static Flag new_flag_bool(
         bool *val,
@@ -122,38 +121,37 @@ void flag_decl_uint(Flags *flags, uint64_t *val, const char *short_flag, const c
     da_append(flags, f);
 }
 
-static bool peek_arg(void *val, FlagType type, int argc, char **argv)
+static bool parse_arg(void *val, FlagType type, char *arg)
 {
-    if(0 == argc) return false;
-    if('-' == *argv[1]) return false;
+    if('-' == *arg) return false;
 
     switch(type)
     {
         case FLAG_BOOL: {
-            bool b = 0 == strcmp(argv[1], "true");
-            if(!(b || 0 == strcmp(argv[1], "false"))) return false;
+            bool b = 0 == strcmp(arg, "true");
+            if(!(b || 0 == strcmp(arg, "false"))) return false;
             *(bool*)val = b;
             return true;
         } break;
         case FLAG_STRING: {
-            *(char**)val = argv[1];  
+            *(char**)val = arg;  
             return true;
         } break;
         case FLAG_DOUBLE: {
             char *endptr;
-            double d = strtod(argv[1], &endptr);
+            double d = strtod(arg, &endptr);
             if(0 != *endptr) return false;
             *(double*)val = d;
         } break;
         case FLAG_INT: {
             char *endptr;
-            long long d = strtoll(argv[1], &endptr, 10);
+            long long d = strtoll(arg, &endptr, 10);
             if(0 != *endptr) return false;
             *(int64_t*)val = d;
         } break;
         case FLAG_UINT: {
             char *endptr;
-            unsigned long long d = strtoull(argv[1], &endptr, 10);
+            unsigned long long d = strtoull(arg, &endptr, 10);
             if(0 != *endptr) return false;
             *(uint64_t*)val = d;
         } break;
@@ -162,8 +160,63 @@ static bool peek_arg(void *val, FlagType type, int argc, char **argv)
     return false;
 }
 
+static Flag* find_long_flag(Flags *flags, const char *name, size_t name_len)
+{
+    da_foreach(Flag, flag, flags)
+    {
+        if (!flag->long_flag) continue;
+        const char *long_name = flag->long_flag + 2;
+        if (strlen(long_name) == name_len && strncmp(long_name, name, name_len) == 0)
+        {
+            return flag;
+        }
+    }
+    return NULL;
+}
+
+static int apply_flag_val(Flag *f, const char *flag_label, int *argc, char ***argv, const char *attached_val)
+{
+    char *val_str = NULL;
+
+    if (attached_val)
+    {
+        val_str = (char *)attached_val;
+    }
+    else if (FLAG_BOOL != f->type)
+    {
+        if (*argc <= 0)
+        {
+            fprintf(stderr, "ERROR: flag '%s' requires an argument\n", flag_label);
+            return 1;
+        }
+        val_str = shift_args(*argc, *argv);
+    }
+    else
+    {
+        if (*argc > 0 && (0 == strcmp(**argv, "true") || 0 == strcmp(**argv, "false")))
+        {
+            val_str = shift_args(*argc, *argv);
+        }
+        else
+        {
+            *(bool *)f->user_ptr = true;
+            return 0;
+        }
+    }
+
+    if (!parse_arg(f->user_ptr, f->type, val_str))
+    {
+        fprintf(stderr, "ERROR: invalid value '%s' for flag '%s'\n", val_str, flag_label);
+        return 1;
+    }
+
+    return 0;
+}
+
 int flag_parse(Flags *flags, int argc, char **argv)
 {
+    shift_args(argc, argv); // remove program name. TODO enforce this from the user?
+
     Flag *short_flags[ALPHABET_SIZE] = {0};
 
     da_foreach(Flag, flag, flags)
@@ -173,7 +226,7 @@ int flag_parse(Flags *flags, int argc, char **argv)
             assert(strlen(flag->short_flag) == 2 && '-' == flag->short_flag[0] && 0 == flag->short_flag[2]);
             short_flags[(unsigned char) flag->short_flag[1]] = flag;
         }
-        if(flag->long_flag) assert(strlen(flag->short_flag) >= 2 && '-' == flag->short_flag[0] && '-' == flag->short_flag[1]);
+        if(flag->long_flag) assert(strlen(flag->long_flag) >= 2 && '-' == flag->long_flag[0] && '-' == flag->long_flag[1]);
 
         switch(flag->type)
         {
@@ -197,70 +250,104 @@ int flag_parse(Flags *flags, int argc, char **argv)
 
     while(argc > 0)
     {
-        const char *flag = shift_args(argc, argv);
-        if('-' != flag[0])
+        char *flag = shift_args(argc, argv);
+        const size_t flag_len = strlen(flag);
+        if(flag_len < 2)
         {
-            fprintf(stderr, "ERROR: invalid flag format '%s'\n", flag);
+            fprintf(stderr, "ERROR: malformed flag '%s'\n", flag);
             return 1;
         }
 
         if('-' == flag[1])
         {
-            // TODO long flag
+            if(2 == flag_len)
+            {
+                fprintf(stderr, "ERROR: standalone '--' is not supported\n");
+                return 1;
+            }
+
+            const char *eq = strchr(flag, '=');
+            const size_t name_len = eq ? (size_t) (eq - flag) : strlen(flag);
+            if (0 == name_len)
+            {
+                fprintf(stderr, "ERROR: malformed long flag '%s'\n", flag);
+                return 1;
+            }
+
+            Flag *f = find_long_flag(flags, flag, name_len);
+            if (!f)
+            {
+                fprintf(stderr, "ERROR: unknown flag '%s'\n", flag);
+                return 1;
+            }
+
+            const char *attached_val = eq ? (eq + 1) : NULL;
+            if (0 != apply_flag_val(f, flag, &argc, &argv, attached_val))
+            {
+                return 1;
+            }
+            continue;
         }
 
-        const size_t flag_len = strlen(flag);
-        if(flag_len < 2) return 1;
-        for(size_t i = 1; i < flag_len; ++i)
+        if(2 == flag_len || '=' == flag[2])
+        {
+            Flag *f = short_flags[(unsigned char) flag[1]];
+            if (!f) 
+            {
+                fprintf(stderr, "ERROR: unknown flag '%s'\n", flag);
+                return 1;
+            }
+
+            char *val_str = NULL;
+            if('=' == flag[2])
+            {
+                val_str = flag + 3;
+            }
+            else if(FLAG_BOOL != f->type)
+            {
+                if(argc <= 0)
+                {
+                    fprintf(stderr, "ERROR: flag '%s' requires an argument\n", flag);
+                    return 1;
+                }
+                val_str = shift_args(argc, argv);
+            }
+            else
+            {
+                if(argc > 0 && (0 == strcmp(*argv, "true") || 0 == strcmp(*argv, "false")))
+                {
+                    val_str = shift_args(argc, argv);
+                }
+                else
+                {
+                    *(bool*)f->user_ptr = true;
+                    continue;
+                }
+            }
+
+            if(!parse_arg(f->user_ptr, f->type, val_str))
+            {
+                fprintf(stderr, "ERROR: invalid value '%s' for flag '%s'\n", val_str, flag);
+                return 1;
+            }
+            continue;
+        }
+
+        for(size_t i = 0; i < flag_len; ++i)
         {
             const char c = flag[i];
             Flag *f = short_flags[(unsigned char) c];
-            if(!f)
+            if (!f) 
             {
                 fprintf(stderr, "ERROR: invalid flag '-%c'\n", c);
                 return 1;
             }
-
-            if(2 == flag_len)
+            if (FLAG_BOOL != f->type) 
             {
-                // TODO error
-                switch(f->type)
-                {
-                    case FLAG_BOOL: {
-                        bool val;
-                        if(!peek_arg(&val, FLAG_BOOL, argc, argv)) val = true;
-                        *(bool*)f->user_ptr = val;
-                    } break;
-                    case FLAG_STRING: {
-                        char *val;
-                        if(!peek_arg(&val, FLAG_STRING, argc, argv)) return 1;
-                        *(char**)f->user_ptr = val;
-                    } break;
-                    case FLAG_DOUBLE: {
-                        double val;
-                        if(!peek_arg(&val, FLAG_DOUBLE, argc, argv)) return 1;
-                        *(double*)f->user_ptr = val;
-                    } break;
-                    case FLAG_INT: {
-                        int64_t val;
-                        if(!peek_arg(&val, FLAG_INT, argc, argv)) return 1;
-                        *(int64_t*)f->user_ptr = val;
-                    } break;
-                    case FLAG_UINT: {
-                        uint64_t val;
-                        if(!peek_arg(&val, FLAG_UINT, argc, argv)) return 1;
-                        *(uint64_t*)f->user_ptr = val;
-                    } break;
-                }
+                fprintf(stderr, "ERROR: flag '-%c' cannot be bundled or take '=' in '%s'\n", c, flag);
+                return 1;
             }
-            else if(1 == i && '=' == flag[2])
-            {
-                
-            }
-            else if(FLAG_BOOL != f->type)
-            {
-                // TODO error
-            }
+            *(bool *)f->user_ptr = true;
         }
     }
 
@@ -270,4 +357,34 @@ int flag_parse(Flags *flags, int argc, char **argv)
 void flag_free(Flags *flags)
 {
     da_free(flags);
+}
+
+void flag_print_info(Flags *flags, const char *header)
+{
+    size_t max_len = 0;
+    da_foreach(Flag, flag, flags)
+    {
+        if(flag->long_flag)
+        {
+            const size_t len = strlen(flag->long_flag);
+            if(len > max_len) max_len = len;
+        }
+    }
+
+    puts(header);
+    da_foreach(Flag, flag, flags)
+    {
+        if(flag->short_flag && flag->long_flag)
+        {
+            printf("    %s, %-*s    %s\n", flag->short_flag, (int) max_len, flag->long_flag, flag->description);
+        }
+        else if (flag->short_flag)
+        {
+            printf("    %s  %-*s    %s\n", flag->short_flag, (int) max_len, "", flag->description);
+        }
+        else if (flag->long_flag)
+        {
+            printf("        %-*s    %s\n", (int)max_len, flag->long_flag, flag->description);
+        }
+    }
 }
