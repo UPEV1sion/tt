@@ -3,8 +3,11 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-
-#include "da.h"
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
+#include <string.h>
 
 #ifndef FLAGDEF
 #define FLAGDEF
@@ -23,6 +26,7 @@ typedef struct {
     const char *short_flag;
     const char *long_flag;
     const char *description;
+    bool seen;
     union {
         char *s;
         bool b;
@@ -75,19 +79,21 @@ FLAGDEF void flag_free(Flags *flags);
 
 FLAGDEF void flag_print_info(Flags *flags, const char *header);
 
+FLAGDEF bool flag_seen(Flags *flags, const char *short_flag, const char *long_flag);
+
 #ifdef FLAG_IMPLEMENTATION
 
-#include <assert.h>
-#include <string.h>
+#define FLAG__DA_INIT_CAP 32
+#define FLAG__DA_GROW_SIZE 2
 
 #define flag__da_reserve(da, expected)                                                 \
     do                                                                                 \
     {                                                                                  \
         if ((expected) > (da)->capacity)                                               \
         {                                                                              \
-            if ((da)->capacity == 0) (da)->capacity = DA_INIT_CAP;                     \
+            if ((da)->capacity == 0) (da)->capacity = FLAG__DA_INIT_CAP;                     \
             while ((expected) > (da)->capacity)                                        \
-                (da)->capacity *= DA_GROW_SIZE;                                        \
+                (da)->capacity *= FLAG__DA_GROW_SIZE;                                        \
             (da)->items = realloc((da)->items, (da)->capacity * sizeof(*(da)->items)); \
             assert((da)->items && "ERROR: out of mem!\n");                             \
         }                                                                              \
@@ -99,6 +105,8 @@ FLAGDEF void flag_print_info(Flags *flags, const char *header);
         flag__da_reserve((da), (da)->count + 1); \
         (da)->items[(da)->count++] = (item);     \
     } while (0)
+
+#define flag__da_foreach(type, name, da) for (type *name = (da)->items; name < (da)->items + (da)->count; ++name)
 
 #define flag__da_free(da) free((da)->items)
 
@@ -173,7 +181,7 @@ FLAGDEF Flag flag__new_flag_double(double *val,
                                    const char *description)
 {
     return (Flag){
-        .type        = FLAG_UINT,
+        .type        = FLAG_DOUBLE,
         .user_ptr    = val,
         .short_flag  = short_flag,
         .long_flag   = long_flag,
@@ -249,7 +257,7 @@ FLAGDEF void flag_decl_uint(Flags *flags,
 
 FLAGDEF bool parse_arg(void *val, FlagType type, char *arg)
 {
-    if ('-' == *arg) return false;
+    if ('-' == *arg && !(FLAG_INT == type || FLAG_DOUBLE == type)) return false;
 
     switch (type)
     {
@@ -270,6 +278,7 @@ FLAGDEF bool parse_arg(void *val, FlagType type, char *arg)
         double d = strtod(arg, &endptr);
         if (0 != *endptr) return false;
         *(double *)val = d;
+        return true;
     }
     break;
     case FLAG_INT: {
@@ -277,6 +286,7 @@ FLAGDEF bool parse_arg(void *val, FlagType type, char *arg)
         long long d = strtoll(arg, &endptr, 10);
         if (0 != *endptr) return false;
         *(int64_t *)val = d;
+        return true;
     }
     break;
     case FLAG_UINT: {
@@ -284,6 +294,7 @@ FLAGDEF bool parse_arg(void *val, FlagType type, char *arg)
         unsigned long long d = strtoull(arg, &endptr, 10);
         if (0 != *endptr) return false;
         *(uint64_t *)val = d;
+        return true;
     }
     break;
     }
@@ -293,7 +304,7 @@ FLAGDEF bool parse_arg(void *val, FlagType type, char *arg)
 
 FLAGDEF Flag *find_long_flag(Flags *flags, const char *name, size_t name_len)
 {
-    da_foreach(Flag, flag, flags)
+    flag__da_foreach(Flag, flag, flags)
     {
         if (!flag->long_flag) continue;
         if (strlen(flag->long_flag) == name_len && strncmp(flag->long_flag, name, name_len) == 0)
@@ -330,6 +341,7 @@ FLAGDEF int apply_flag_val(Flag *f, const char *flag_label, int *argc, char ***a
         else
         {
             *(bool *)f->user_ptr = true;
+            f->seen = true;
             return 0;
         }
     }
@@ -340,6 +352,7 @@ FLAGDEF int apply_flag_val(Flag *f, const char *flag_label, int *argc, char ***a
         return 1;
     }
 
+    f->seen = true;
     return 0;
 }
 
@@ -347,8 +360,9 @@ FLAGDEF int flag_parse(Flags *flags, int argc, char **argv)
 {
     Flag *short_flags[FLAG__ALPHABET_SIZE] = {0};
 
-    da_foreach(Flag, flag, flags)
+    flag__da_foreach(Flag, flag, flags)
     {
+        flag->seen = false;
         if (flag->short_flag)
         {
             assert(strlen(flag->short_flag) == 2 && '-' == flag->short_flag[0] && 0 == flag->short_flag[2]);
@@ -443,6 +457,7 @@ FLAGDEF int flag_parse(Flags *flags, int argc, char **argv)
                 else
                 {
                     *(bool *)f->user_ptr = true;
+                    f->seen = true;
                     continue;
                 }
             }
@@ -452,6 +467,7 @@ FLAGDEF int flag_parse(Flags *flags, int argc, char **argv)
                 fprintf(stderr, "ERROR: invalid value '%s' for flag '%s'\n", val_str, flag);
                 return 1;
             }
+            f->seen = true;
             continue;
         }
 
@@ -470,6 +486,7 @@ FLAGDEF int flag_parse(Flags *flags, int argc, char **argv)
                 return 1;
             }
             *(bool *)f->user_ptr = true;
+            f->seen = true;
         }
     }
 
@@ -484,7 +501,7 @@ FLAGDEF void flag_free(Flags *flags)
 FLAGDEF void flag_print_info(Flags *flags, const char *header)
 {
     size_t max_len = 0;
-    da_foreach(Flag, flag, flags)
+    flag__da_foreach(Flag, flag, flags)
     {
         if (flag->long_flag)
         {
@@ -494,7 +511,7 @@ FLAGDEF void flag_print_info(Flags *flags, const char *header)
     }
 
     puts(header);
-    da_foreach(Flag, flag, flags)
+    flag__da_foreach(Flag, flag, flags)
     {
         if (!flag->short_flag && !flag->long_flag) continue;
 
@@ -504,6 +521,24 @@ FLAGDEF void flag_print_info(Flags *flags, const char *header)
 
         printf("    %s%s%-*s    %s\n", short_f, sep, (int)max_len, long_f, flag->description);
     }
+}
+
+FLAGDEF bool flag_seen(Flags *flags, const char *short_flag, const char *long_flag)
+{
+    flag__da_foreach(Flag, flag, flags)
+    {
+        const bool short_matches = (short_flag && flag->short_flag) &&
+                                   (0 == strcmp(flag->short_flag, short_flag));
+        const bool long_matches  = (long_flag && flag->long_flag) &&
+                                   (0 == strcmp(flag->long_flag, long_flag));
+        if(short_flag && long_flag && (short_matches ^ long_matches))
+        {
+            fprintf(stderr, "WARNING: flag inconsistency detected! '%s' and '%s' do not match the declared flag!\n", short_flag, long_flag);
+        }
+        if(short_matches || long_matches) return flag->seen;
+    }
+
+    return false;
 }
 
 #endif // FLAG_IMPLEMENTATION
