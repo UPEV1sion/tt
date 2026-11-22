@@ -80,7 +80,7 @@ FLAGDEF void flag_print_info(Flags *flags, const char *header);
 #include <assert.h>
 #include <string.h>
 
-#define flag__da_reserve(da, expected)                                                       \
+#define flag__da_reserve(da, expected)                                                 \
     do                                                                                 \
     {                                                                                  \
         if ((expected) > (da)->capacity)                                               \
@@ -93,11 +93,11 @@ FLAGDEF void flag_print_info(Flags *flags, const char *header);
         }                                                                              \
     } while (0)
 
-#define flag__da_append(da, item)                  \
-    do                                       \
-    {                                        \
-        flag__da_reserve((da), (da)->count + 1);   \
-        (da)->items[(da)->count++] = (item); \
+#define flag__da_append(da, item)                \
+    do                                           \
+    {                                            \
+        flag__da_reserve((da), (da)->count + 1); \
+        (da)->items[(da)->count++] = (item);     \
     } while (0)
 
 #define flag__da_free(da) free((da)->items)
@@ -105,11 +105,8 @@ FLAGDEF void flag_print_info(Flags *flags, const char *header);
 #define FLAG__ALPHABET_SIZE 256
 #define flag__shift_args(argc, argv) ((argc)--, *(argv)++)
 
-FLAGDEF Flag flag__new_flag_bool(bool *val, 
-                                 const char *short_flag, 
-                                 const char *long_flag, 
-                                 bool default_val, 
-                                 const char *description)
+FLAGDEF Flag
+flag__new_flag_bool(bool *val, const char *short_flag, const char *long_flag, bool default_val, const char *description)
 {
     return (Flag){
         .type        = FLAG_BOOL,
@@ -186,11 +183,11 @@ FLAGDEF Flag flag__new_flag_double(double *val,
 }
 
 FLAGDEF void flag_decl_bool(Flags *flags,
-                       bool *val,
-                       const char *short_flag,
-                       const char *long_flag,
-                       bool default_val,
-                       const char *description)
+                            bool *val,
+                            const char *short_flag,
+                            const char *long_flag,
+                            bool default_val,
+                            const char *description)
 {
     if (!short_flag && !long_flag) fprintf(stderr, "WARNING: no short nor long flag provided!\n");
 
@@ -365,10 +362,10 @@ FLAGDEF int flag_parse(Flags *flags, int argc, char **argv)
 
         switch (flag->type)
         {
-        case FLAG_BOOL:   *(bool *)flag->user_ptr     = flag->defaults.b; break;
-        case FLAG_STRING: *(char **)flag->user_ptr    = flag->defaults.s; break;
-        case FLAG_DOUBLE: *(double *)flag->user_ptr   = flag->defaults.d; break;
-        case FLAG_INT:    *(int64_t *)flag->user_ptr  = flag->defaults.i; break;
+        case FLAG_BOOL:   *(bool *)flag->user_ptr = flag->defaults.b; break;
+        case FLAG_STRING: *(char **)flag->user_ptr = flag->defaults.s; break;
+        case FLAG_DOUBLE: *(double *)flag->user_ptr = flag->defaults.d; break;
+        case FLAG_INT:    *(int64_t *)flag->user_ptr = flag->defaults.i; break;
         case FLAG_UINT:   *(uint64_t *)flag->user_ptr = flag->defaults.u; break;
         }
     }

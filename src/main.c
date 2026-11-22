@@ -620,61 +620,50 @@ static int list_tasks(int argc, char **argv)
 {
     Tasks tasks = {0};
     load_tasks(&tasks);
-    bool all_tasks = false;
-    bool verbose   = false;
 
-    // TODO help flag for list
-    // TODO maybe convert this to getopt, to allow for something like -dr
-    while (argc > 0)
+    // clang-format off
+    Flags flags = {0};
+    char *filter;
+    bool date_sort, prio_sort, topo_sort, reverse, all_tasks, verbose, help;
+    flag_decl_str(&flags,  &filter,    "-f", "--filter",      NULL,  "Filter tasks using the query language");
+    flag_decl_bool(&flags, &date_sort, "-d", "--date",        false, "Sort by creation date (descending)");
+    flag_decl_bool(&flags, &prio_sort, "-p", "--priority",    true,  "Sort by priority (descending, default)");
+    flag_decl_bool(&flags, &topo_sort, "-t", "--topological", false, "Sort refereces by topological ordering (descending)");
+    flag_decl_bool(&flags, &reverse,   "-r", "--reverse",     false, "Reverse the sorting order (ascending)");
+    flag_decl_bool(&flags, &all_tasks, "-a", "--all",         false, "Display all tasks, even the closed ones");
+    flag_decl_bool(&flags, &verbose,   "-v", "--verbose",     false, "Display the whole task file");
+    flag_decl_bool(&flags, &help,      "-h", "--help",        false, "Display help for the list subcommand");
+    if (flag_parse(&flags, argc, argv) != 0)
     {
-        const char *flag = shift_args(argc, argv);
-        if (0 == strcmp(flag, "-f") || 0 == strcmp(flag, "--filter"))
-        {
-            const char *filter = shift_args(argc, argv);
-            assertmsg(argc >= 0, "ERROR: no filter provided!\n");
-            Lexer *lexer = lexer_new(filter);
-            if (!lexer) goto defer;
+        flag_print_info(&flags, "LIST FLAGS");
+        return 1;
+    }
+    // clang-format on
 
-            Ops ops = {0};
-            parse_expr(lexer, &ops);
-            filter_tasks(&tasks, &ops);
+    if (help)
+    {
+        flag_print_info(&flags, "LIST FLAGS");
+        return 0;
+    }
+    sort_options.desc = !reverse;
+    if (prio_sort) sort_options.target = SORT_PRIO;
+    if (date_sort) sort_options.target = SORT_TIMESTAMP;
+    if (topo_sort) sort_options.target = SORT_TOPOLOGICAL;
+    if (filter)
+    {
+        Lexer *lexer = lexer_new(filter);
+        if (!lexer) goto defer;
 
-            da_foreach(Op, op, &ops)
-            {
-                free(op->lexeme);
-            }
-            da_free(&ops);
-            lexer_free(lexer);
-        }
-        else if (0 == strcmp("-d", flag) || 0 == strcmp("--date", flag))
+        Ops ops = {0};
+        parse_expr(lexer, &ops);
+        filter_tasks(&tasks, &ops);
+
+        da_foreach(Op, op, &ops)
         {
-            sort_options.target = SORT_TIMESTAMP;
+            free(op->lexeme);
         }
-        else if (0 == strcmp("-p", flag) || 0 == strcmp("--priority", flag))
-        {
-            sort_options.target = SORT_PRIO;
-        }
-        else if (0 == strcmp("-t", flag) || 0 == strcmp("--topological", flag))
-        {
-            sort_options.target = SORT_TOPOLOGICAL;
-        }
-        else if (0 == strcmp("-r", flag) || 0 == strcmp("--reverse", flag))
-        {
-            sort_options.desc = false;
-        }
-        else if (0 == strcmp("-a", flag) || 0 == strcmp("--all", flag))
-        {
-            all_tasks = true;
-        }
-        else if (0 == strcmp("-v", flag) || 0 == strcmp("--verbose", flag))
-        {
-            verbose = true;
-        }
-        else
-        {
-            fprintf(stderr, "ERROR: unknown list flag '%s'\n", flag);
-            return 1;
-        }
+        da_free(&ops);
+        lexer_free(lexer);
     }
 
     if (sort_options.target != SORT_TOPOLOGICAL)
@@ -720,13 +709,10 @@ static int edit_tasks(int argc, char **argv)
     {
         fprintf(stderr, "USAGE: tt edit <task-id> [options]\n");
         fprintf(stderr, "OPTIONS:\n");
-        fprintf(stderr, "    -s, --status <STATUS>           Set task status "
-                        "(OPEN, IN_PROGRESS, CLOSED)\n");
+        fprintf(stderr, "    -s, --status <STATUS>           Set task status (OPEN, IN_PROGRESS, CLOSED)\n");
         fprintf(stderr, "    -p, --priority <0-100>          Set task priority\n");
-        fprintf(stderr, "    -t, --tags <tags>               Overwrite task "
-                        "tags (comma-separated)\n");
-        fprintf(stderr, "    -r, --references <references>   Overwrite task "
-                        "references (comma-separated)\n");
+        fprintf(stderr, "    -t, --tags <tags>               Overwrite task tags (comma-separated)\n");
+        fprintf(stderr, "    -r, --references <references>   Overwrite task references (comma-separated)\n");
         return 1;
     }
 
