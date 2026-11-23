@@ -28,9 +28,9 @@ Options:
 
     -p, --priority     Sort by priority (descending, default)
 
-    -t, --topological  Sort refereces by topological ordering (descending)
+    -g, --graph        Sort refereces by topological ordering (descending)
 
-    -r, --reverse      Reverse the sorting order (ascending)
+    -i, --inverse      Inverse the sorting order (ascending)
 
     -f, --filter       Filter tasks using the Query Language
 
