@@ -252,15 +252,17 @@ static void load_tasks(Tasks *tasks)
         char path[BUFSIZE];
         snprintf(path, sizeof(path), "./tasks/%s", dir_entry->d_name);
         struct stat sb;
-        if(stat(path, &sb) != 0)
+        if (stat(path, &sb) != 0)
         {
             fprintf(stderr, "ERROR: could not stat %s: %s. Continuing...\n", path, strerror(errno));
-            continue; 
+            continue;
         }
 
-        if(!S_ISDIR(sb.st_mode))
+        if (!S_ISDIR(sb.st_mode))
         {
-            fprintf(stderr, "ERROR: malformed \"tasks\" folder. Please remove \"./tasks/%s\"! Continuing...\n", dir_entry->d_name);
+            fprintf(stderr,
+                    "ERROR: malformed \"tasks\" folder. Please remove \"./tasks/%s\"! Continuing...\n",
+                    dir_entry->d_name);
             continue;
         }
         const Task task = parse_task(strdup(dir_entry->d_name));
@@ -881,7 +883,7 @@ int main(int argc, char **argv)
     }
     else if (0 == strcmp(subcommand, "list"))
     {
-        return list_tasks(argc, argv); 
+        return list_tasks(argc, argv);
     }
     else if (0 == strcmp(subcommand, "edit"))
     {

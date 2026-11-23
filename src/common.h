@@ -5,12 +5,12 @@
 #ifndef COMMON_H_
 #define COMMON_H_
 
+#include <assert.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <assert.h>
 
 #define ARRAY_LEN(a) (sizeof(a) / sizeof(a[0]))
 #define assertmsg(cond, ...)              \
@@ -31,7 +31,7 @@ static_assert(sizeof(size_t) == sizeof(int64_t), "ERROR: 32 bit env detected, pl
 
 typedef int64_t ssize_t;
 
-char* strdup(const char *s);
+char *strdup(const char *s);
 
 #endif // _GNU_SOURCE
 
