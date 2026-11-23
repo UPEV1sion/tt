@@ -21,7 +21,6 @@
         exit(1);                                       \
     } while (0)
 
-
 typedef enum {
     TOK_AND,
     TOK_OR,
@@ -156,7 +155,7 @@ static Token lexer_next_tok(Lexer *lexer)
         }
         else
         {
-            if(isprint((unsigned char) lexer->cur_char))
+            if (isprint((unsigned char)lexer->cur_char))
             {
                 error(lexer->input, lexer->pos, "ERROR: invalid character '%c'\n", lexer->cur_char);
             }

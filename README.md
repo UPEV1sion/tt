@@ -102,7 +102,7 @@ After that a markdown file will be created in a folder with a timestamp (e.g. `t
 - STATUS: OPEN
 - PRIORITY: 20
 - TAGS: feature, cli
-- REFERENCES: 20260328-085723
+- REFERENCES: 20260328-085724
 ```
 
 The user can add arbitrary files into the created folder and write additional information _after_ the preamble.

@@ -601,6 +601,16 @@ static void sort_topological(Tasks *tasks)
         }
     }
 
+    if (placed != n)
+    {
+        fprintf(stderr, "ERROR: reference cycle detected:\n");
+        for (size_t i = 0; i < n; ++i)
+        {
+            if (in_edges[i] > 0) fprintf(stderr, "    %s\n", tasks->items[i].id);
+        }
+        goto err;
+    }
+
     for (size_t k = 0; k < n; ++k) da_free(&dependents[k]);
     free(dependents);
     free(queue);
