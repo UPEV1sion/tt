@@ -1,5 +1,5 @@
 CC := gcc
-CFLAGS := -Wall -Wextra -Werror -Wconversion -Wformat=2 -pedantic -std=c17 -ggdb
+CFLAGS := -Wall -Wextra -Werror -Wconversion -Wformat=2 -pedantic -std=c17 -O3
 CPPFLAGS := -MMD -MP
 
 DESTDIR  := build
@@ -39,7 +39,7 @@ $(TARGET): $(OBJS)
 
 -include $(DEPS)
 
-test:
+test: $(TARGET)
 	pytest ./tests
 
 fmt:

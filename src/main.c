@@ -481,7 +481,7 @@ static void print_usage(const char *program)
     printf("OPTIONS FOR \"list\":\n");
     printf("    -d, --date                 Sort by creation date (descending)\n");
     printf("    -p, --priority             Sort by priority (descending, default)\n");
-    printf("    -g, --graph                Sort refereces by topological ordering (descending)\n");
+    printf("    -g, --graph                Sort references by topological ordering (descending)\n");
     printf("    -i, --inverse              Inverse the sorting order (ascending)\n");
     printf("    -f, --filter <query>       Filter tasks using a query string\n");
     printf("                               Syntax:  '.<tag>', 'and', 'or', 'not', 'tagged', 'untagged', '(', ')'\n");
@@ -643,7 +643,7 @@ static int list_tasks(int argc, char **argv)
     flag_decl_str(&flags,  &filter,    "-f", "--filter",   NULL,  "Filter tasks using the query language");
     flag_decl_bool(&flags, &date_sort, "-d", "--date",     false, "Sort by creation date (descending)");
     flag_decl_bool(&flags, &prio_sort, "-p", "--priority", true,  "Sort by priority (descending, default)");
-    flag_decl_bool(&flags, &topo_sort, "-g", "--graph",    false, "Sort refereces by topological ordering (descending)");
+    flag_decl_bool(&flags, &topo_sort, "-g", "--graph",    false, "Sort references by topological ordering (descending)");
     flag_decl_bool(&flags, &reverse,   "-i", "--inverse",  false, "Inverse the sorting order (ascending)");
     flag_decl_bool(&flags, &all_tasks, "-a", "--all",      false, "Display all tasks, even the closed ones");
     flag_decl_bool(&flags, &verbose,   "-v", "--verbose",  false, "Display the whole task file");
@@ -652,11 +652,13 @@ static int list_tasks(int argc, char **argv)
     if (flag_parse(&flags, argc, argv) != 0)
     {
         flag_print_info(&flags, "LIST FLAGS");
+        flag_free(&flags);
         return 1;
     }
     if (help)
     {
         flag_print_info(&flags, "LIST FLAGS");
+        flag_free(&flags);
         return 0;
     }
     flag_free(&flags);
@@ -722,6 +724,7 @@ static void append_missing(StringBuilder *out, const char *tags, bool has_tags, 
 
 static int edit_tasks(int argc, char **argv)
 {
+    // TODO make this atomic
     const char *task_id = shift_args(argc, argv);
 
     char *new_status = NULL;
@@ -738,15 +741,17 @@ static int edit_tasks(int argc, char **argv)
     flag_decl_str(&flags,  &new_refs,   "-r", "--references", NULL,  "Override tasks references (comma-separated)");
     flag_decl_bool(&flags, &help,       "-h", "--help",       false, "Display help for the edit subcommand");
     assert(flags.count == 5 && "flags changed, remember to change README and print_usage!");
-    if(flag_parse(&flags, argc, argv) != 0)
+    if (flag_parse(&flags, argc, argv) != 0)
     {
         flag_print_info(&flags, "EDIT FLAGS");
+        flag_free(&flags);
         return 1;
     }
 
-    if(help || argc <= 0)
+    if (help || argc <= 0)
     {
         flag_print_info(&flags, "EDIT FLAGS");
+        flag_free(&flags);
         return 0;
     }
     // clang-format on

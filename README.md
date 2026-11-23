@@ -28,7 +28,7 @@ Options:
 
     -p, --priority     Sort by priority (descending, default)
 
-    -g, --graph        Sort refereces by topological ordering (descending)
+    -g, --graph        Sort references by topological ordering (descending)
 
     -i, --inverse      Inverse the sorting order (ascending)
 
@@ -117,7 +117,7 @@ For example:
 Add support for verbose output (-v, --verbose), to print the content of each task.
 
 ```console
-$ ./tt -v
+$ ./tt list -av
 ./tasks/20260328-085723/TASK.md: [PRIORITY: 20, TAGS: feature, cli] Verbose output
 > # Verbose output
 > 
