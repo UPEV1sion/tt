@@ -484,10 +484,10 @@ static void print_usage(const char *program)
     printf("    -r, --reverse              Reverse the sorting order (ascending)\n");
     printf("    -f, --filter <query>       Filter tasks using a query string\n");
     printf("                               Syntax:  '.<tag>', 'and', 'or', 'not', 'tagged', 'untagged', '(', ')'\n");
-    printf("                               Example: list -f \".bug or untagged\"\n\n");
+    printf("                               Example: list -f \".bug or untagged\"\n");
     printf("    -a, --all                  Display all tasks, even the closed ones\n");
     printf("    -v, --verbose              Display the whole task file\n");
-    printf("    -h, --help                 Display the help menu for the list subcommand\n");
+    printf("    -h, --help                 Display the help menu for the list subcommand\n\n");
 
     printf("OPTIONS FOR \"edit\":\n");
     printf("    -s, --status <STATUS>      Set task status (OPEN, IN_PROGRESS, CLOSED)\n");
@@ -495,7 +495,7 @@ static void print_usage(const char *program)
     printf("    -t, --tags <tags>          Overwrite task tags comma-separated)\n");
     printf("    -r, --references <refs>    Overwrite task references (comma-separated)\n");
     printf("                               Example: edit 20260328-085723 -s IN_PROGRESS -p 80\n");
-    printf("    -h, --help                 Display the help menu for the edit subcommand\n");
+    printf("    -h, --help                 Display the help menu for the edit subcommand\n\n");
 }
 
 static SortOptions sort_options = {.desc = true, .target = SORT_PRIO};

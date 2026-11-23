@@ -111,20 +111,8 @@ static Token lexer_next_tok(Lexer *lexer)
 
             while (is_tag_char(lexer->cur_char) && pos < BUFSIZE - 1)
             {
-                buffer[pos++] = (unsigned char)lexer->cur_char;
+                buffer[pos++] = (char)lexer->cur_char;
                 lexer_advance(lexer);
-
-                size_t pos = 0;
-                char buffer[BUFSIZE];
-
-                while(is_tag_char(lexer->cur_char) && pos < BUFSIZE - 1)
-                {
-                    buffer[pos++] = (char) lexer->cur_char;
-                    lexer_advance(lexer);
-                }
-
-                buffer[pos] = 0;
-                tok = token_new(lexer->arena, TOK_TAG, buffer, start);
             }
 
             buffer[pos] = 0;
@@ -138,7 +126,7 @@ static Token lexer_next_tok(Lexer *lexer)
 
             do
             {
-                buffer[pos++] = (unsigned char)lexer->cur_char;
+                buffer[pos++] = (char)lexer->cur_char;
                 lexer_advance(lexer);
             } while (is_tag_char(lexer->cur_char) && pos < BUFSIZE - 1);
 
@@ -149,20 +137,8 @@ static Token lexer_next_tok(Lexer *lexer)
             {
                 if (0 == strcmp(keywords[i].lexeme, buffer))
                 {
-                    buffer[pos++] = (char) lexer->cur_char;
-                    lexer_advance(lexer);
-                } while(is_tag_char(lexer->cur_char) && pos < BUFSIZE - 1);
-
-                buffer[pos] = 0;
-
-                TokenType type = TOK_ID;
-                for(size_t i = 0; i < ARRAY_LEN(keywords); ++i)
-                {
-                    if(0 == strcmp(keywords[i].lexeme, buffer))
-                    {
-                        type = keywords[i].type;
-                        break;
-                    }
+                    type = keywords[i].type;
+                    break;
                 }
             }
 
@@ -278,8 +254,7 @@ static void parse_primary(Lexer *lexer, Ops *ops)
         const Token id = lexer->last_tok;
         error(lexer->input,
               id.pos,
-              "ERROR: unknown identifier \"%s\". Tags need a '.' prefix, did "
-              "you mean \".%s\"?\n",
+              "ERROR: unknown identifier \"%s\". Tags need a '.' prefix, did you mean \".%s\"?\n",
               id.lexeme,
               id.lexeme);
         // const Op op = op_new(OP_ID, lexer->last_tok.lexeme);
