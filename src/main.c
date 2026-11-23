@@ -459,12 +459,13 @@ static void create_new_task(void)
 
 static void print_usage(const char *program)
 {
+    // TODO how can this be synced with flag decls?
     printf("USAGE: %s <subcommand> [options]\n\n", program);
     printf("SUBCOMMANDS:\n");
-    printf("    new                        Create a new task interactively\n");
-    printf("    list [options]             List, sort, and filter active tasks (default)\n");
-    printf("    edit <task-id> [options]   Modify an existing task's metadata\n");
-    printf("    help                       Print this help menu\n\n");
+    printf("    new                      Create a new task interactively\n");
+    printf("    list [flags]             List, sort, and filter active tasks (default)\n");
+    printf("    edit <task-id> [flags]   Modify an existing task's metadata\n");
+    printf("    help                     Print this help menu\n\n");
 
     printf("OPTIONS FOR \"list\":\n");
     printf("    -d, --date                 Sort by creation date (descending)\n");
@@ -472,10 +473,11 @@ static void print_usage(const char *program)
     printf("    -t, --topological          Sort refereces by topological ordering (descending)\n");
     printf("    -r, --reverse              Reverse the sorting order (ascending)\n");
     printf("    -f, --filter <query>       Filter tasks using a query string\n");
-    printf("    -a, --all                  Display all tasks, even the closed ones\n");
-    printf("    -v, --verbose              Display the whole task file\n");
     printf("                               Syntax:  '.<tag>', 'and', 'or', 'not', 'tagged', 'untagged', '(', ')'\n");
     printf("                               Example: list -f \".bug or untagged\"\n\n");
+    printf("    -a, --all                  Display all tasks, even the closed ones\n");
+    printf("    -v, --verbose              Display the whole task file\n");
+    printf("    -h, --help                 Display the help menu for the list subcommand\n");
 
     printf("OPTIONS FOR \"edit\":\n");
     printf("    -s, --status <STATUS>      Set task status (OPEN, IN_PROGRESS, CLOSED)\n");
@@ -483,6 +485,7 @@ static void print_usage(const char *program)
     printf("    -t, --tags <tags>          Overwrite task tags comma-separated)\n");
     printf("    -r, --references <refs>    Overwrite task references (comma-separated)\n");
     printf("                               Example: edit 20260328-085723 -s IN_PROGRESS -p 80\n");
+    printf("    -h, --help                 Display the help menu for the edit subcommand\n");
 }
 
 static SortOptions sort_options = {.desc = true, .target = SORT_PRIO};
@@ -630,14 +633,14 @@ static int list_tasks(int argc, char **argv)
         flag_print_info(&flags, "LIST FLAGS");
         return 1;
     }
-    flag_free(&flags);
-    // clang-format on
-
     if (help)
     {
         flag_print_info(&flags, "LIST FLAGS");
         return 0;
     }
+    flag_free(&flags);
+    // clang-format on
+
     sort_options.desc = !reverse;
     if (prio_sort) sort_options.target = SORT_PRIO;
     if (date_sort) sort_options.target = SORT_TIMESTAMP;
@@ -698,70 +701,58 @@ static void append_missing(StringBuilder *out, const char *tags, bool has_tags, 
 
 static int edit_tasks(int argc, char **argv)
 {
-    if (argc < 1)
+    const char *task_id = shift_args(argc, argv);
+
+    char *new_status = NULL;
+    char *new_tags   = NULL;
+    char *new_refs   = NULL;
+    long new_prio    = -1;
+    bool help;
+
+    // clang-format off
+    Flags flags = {0};
+    flag_decl_str(&flags,  &new_status, "-s", "--status",     NULL,  "Set task status (OPEN, IN_PROGRESS, CLOSED)");
+    flag_decl_int(&flags,  &new_prio,   "-p", "--priority",   -1,    "Set task priority (0-100)");
+    flag_decl_str(&flags,  &new_tags,   "-t", "--tags",       NULL,  "Override tasks tags (comma-separated)");
+    flag_decl_str(&flags,  &new_refs,   "-r", "--references", NULL,  "Override tasks references (comma-separated)");
+    flag_decl_bool(&flags, &help,       "-h", "--help",       false, "Display help for the edit subcommand");
+    if(flag_parse(&flags, argc, argv) != 0)
     {
-        fprintf(stderr, "USAGE: tt edit <task-id> [options]\n");
-        fprintf(stderr, "OPTIONS:\n");
-        fprintf(stderr, "    -s, --status <STATUS>           Set task status (OPEN, IN_PROGRESS, CLOSED)\n");
-        fprintf(stderr, "    -p, --priority <0-100>          Set task priority\n");
-        fprintf(stderr, "    -t, --tags <tags>               Overwrite task tags (comma-separated)\n");
-        fprintf(stderr, "    -r, --references <references>   Overwrite task references (comma-separated)\n");
+        flag_print_info(&flags, "EDIT FLAGS");
         return 1;
     }
 
-    const char *task_id = shift_args(argc, argv);
-
-    const char *new_status = NULL;
-    const char *new_tags   = NULL;
-    const char *new_refs   = NULL;
-    long new_prio          = -1;
-
-    while (argc > 0)
+    if(help || argc <= 0)
     {
-        const char *flag = shift_args(argc, argv);
-        if (0 == strcmp(flag, "-s") || 0 == strcmp(flag, "--status"))
+        flag_print_info(&flags, "EDIT FLAGS");
+        return 0;
+    }
+    // clang-format on
+
+    if (new_status)
+    {
+        static_assert(status_count_ == 3, "status count has changed");
+        if (0 != strcmp(new_status, "OPEN") && 0 != strcmp(new_status, "IN_PROGRESS") &&
+            0 != strcmp(new_status, "CLOSED"))
         {
-            assertmsg(argc > 0, "ERROR: status flag required an argument\n");
-            new_status = shift_args(argc, argv);
-            static_assert(status_count_ == 3, "status count has changed");
-            if (0 != strcmp(new_status, "OPEN") && 0 != strcmp(new_status, "IN_PROGRESS") &&
-                0 != strcmp(new_status, "CLOSED"))
-            {
-                fprintf(stderr, "ERROR: Invalid status \"%s\"\n", new_status);
-                fprintf(stderr, "ERROR: Available options: \"OPEN\", \"IN_PROGRESS\", \"CLOSED\"\n");
-                return 1;
-            }
-        }
-        else if (0 == strcmp(flag, "-p") || 0 == strcmp(flag, "--priority"))
-        {
-            assertmsg(argc > 0, "ERROR: priority flag required an argument\n");
-            const char *prio_str = shift_args(argc, argv);
-            char *endptr;
-            new_prio = strtol(prio_str, &endptr, 10);
-            assertmsg(*endptr == 0 && new_prio >= 0 && new_prio <= 100, "ERROR: Invalid priority (0-100)\n");
-        }
-        else if (0 == strcmp(flag, "-t") || 0 == strcmp(flag, "--tags"))
-        {
-            assertmsg(argc > 0, "ERROR: tags flag required an argument");
-            new_tags = shift_args(argc, argv);
-        }
-        else if (0 == strcmp(flag, "-r") || 0 == strcmp(flag, "--references"))
-        {
-            assertmsg(argc > 0, "ERROR: references flag required an argument");
-            new_refs = shift_args(argc, argv);
-        }
-        else
-        {
-            fprintf(stderr, "ERROR: Unknown edit option '%s'\n", flag);
+            fprintf(stderr, "ERROR: Invalid status \"%s\"\n", new_status);
+            fprintf(stderr, "ERROR: Available options: \"OPEN\", \"IN_PROGRESS\", \"CLOSED\"\n");
             return 1;
         }
+    }
+    if (new_prio >= 0)
+    {
+        assertmsg(new_prio >= 0 && new_prio <= 100, "ERROR: Invalid priority (0-100)\n");
     }
 
     if (!new_status && new_prio == -1 && !new_tags && !new_refs)
     {
-        fprintf(stderr, "WARNING: Nothing to edit. Provide -s, -p, -t, or -r flags.\n");
+        fprintf(stderr, "WARNING: Nothing to edit.\n");
+        flag_print_info(&flags, "EDIT FLAGS");
         return 0;
     }
+
+    flag_free(&flags);
 
     char path[BUFSIZE];
     snprintf(path, sizeof(path), "./tasks/%s/TASK.md", task_id);
