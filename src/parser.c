@@ -12,6 +12,16 @@
 #include "da.h"
 #include "parser.h"
 
+#define error(input, caret_pos, ...)                   \
+    do                                                 \
+    {                                                  \
+        fprintf(stderr, __VA_ARGS__);                  \
+        fprintf(stderr, "\"%s\"\n", input);            \
+        fprintf(stderr, "%*s^\n", (int)caret_pos, ""); \
+        exit(1);                                       \
+    } while (0)
+
+
 typedef enum {
     TOK_AND,
     TOK_OR,
@@ -144,6 +154,17 @@ static Token lexer_next_tok(Lexer *lexer)
 
             tok = token_new(lexer->arena, type, buffer, start);
         }
+        else
+        {
+            if(isprint((unsigned char) lexer->cur_char))
+            {
+                error(lexer->input, lexer->pos, "ERROR: invalid character '%c'\n", lexer->cur_char);
+            }
+            else
+            {
+                error(lexer->input, lexer->pos, "ERROR: invalid character 0x%02x\n", lexer->cur_char);
+            }
+        }
     }
     break;
     }
@@ -200,7 +221,7 @@ static bool match(Lexer *lexer, const TokenType type)
 
 static bool is_end(const Token token)
 {
-    return token.type == TOK_INVALID || token.type == TOK_EOF;
+    return token.type == TOK_EOF;
 }
 
 static Op op_new(const OpCode code, const char *lexeme)
@@ -233,15 +254,6 @@ static void token_text(const Token t, char *buf, const size_t size)
     default:         snprintf(buf, size, "%s", t.lexeme ? t.lexeme : "?"); break;
     }
 }
-
-#define error(input, caret_pos, ...)                   \
-    do                                                 \
-    {                                                  \
-        fprintf(stderr, __VA_ARGS__);                  \
-        fprintf(stderr, "\"%s\"\n", input);            \
-        fprintf(stderr, "%*s^\n", (int)caret_pos, ""); \
-        exit(1);                                       \
-    } while (0)
 
 static void parse_unary(Lexer *lexer, Ops *ops);
 static void parse_and(Lexer *lexer, Ops *ops);
@@ -323,7 +335,9 @@ static void parse_and(Lexer *lexer, Ops *ops)
     while (match(lexer, TOK_AND))
     {
         if (is_end(lexer->cur_tok))
+        {
             error(lexer->input, lexer->last_tok.pos, "ERROR: expected expression after \"and\"\n");
+        }
 
         parse_unary(lexer, ops);
         const Op op = op_new(OP_AND, NULL);
@@ -337,7 +351,9 @@ static void parse_or(Lexer *lexer, Ops *ops)
     while (match(lexer, TOK_OR))
     {
         if (is_end(lexer->cur_tok))
+        {
             error(lexer->input, lexer->last_tok.pos, "ERROR: expected expression after \"or\"\n");
+        }
 
         parse_and(lexer, ops);
         const Op op = op_new(OP_OR, NULL);

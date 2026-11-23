@@ -12,6 +12,7 @@ UseTab: Never
 BreakStringLiterals: false
 AllowShortBlocksOnASingleLine: Empty
 AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+AllowShortLoopsOnASingleLine: true
 AllowShortFunctionsOnASingleLine: None
 AllowShortEnumsOnASingleLine: true
 KeepEmptyLinesAtTheStartOfBlocks: true

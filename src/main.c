@@ -121,8 +121,7 @@ static Task parse_task(char *id)
             size_t read      = 0;
             size_t write     = 0;
             const size_t len = meta.len < BUFSIZE ? meta.len : BUFSIZE;
-            while (isspace(meta.s[read]))
-                read++;
+            while (isspace(meta.s[read])) read++;
             while (write < len - 1 && isdigit(meta.s[read]))
             {
                 prio_buf[write++] = meta.s[read++];
@@ -602,19 +601,18 @@ static void sort_topological(Tasks *tasks)
         }
     }
 
-    for (size_t k = 0; k < n; ++k)
-        da_free(&dependents[k]);
+    for (size_t k = 0; k < n; ++k) da_free(&dependents[k]);
     free(dependents);
     free(queue);
     free(in_edges);
     ht_free(&id_to_idx);
+    da_free(tasks);
 
     tasks->items = sorted;
     return;
 
 err:
-    for (size_t k = 0; k < n; ++k)
-        da_free(&dependents[k]);
+    for (size_t k = 0; k < n; ++k) da_free(&dependents[k]);
     free(dependents);
     free(sorted);
     free(queue);

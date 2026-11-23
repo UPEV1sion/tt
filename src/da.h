@@ -35,8 +35,7 @@ typedef struct {
         if ((expected) > (da)->capacity)                                               \
         {                                                                              \
             if ((da)->capacity == 0) (da)->capacity = DA_INIT_CAP;                     \
-            while ((expected) > (da)->capacity)                                        \
-                (da)->capacity *= DA_GROW_SIZE;                                        \
+            while ((expected) > (da)->capacity) (da)->capacity *= DA_GROW_SIZE;        \
             (da)->items = realloc((da)->items, (da)->capacity * sizeof(*(da)->items)); \
             assertmsg((da)->items, "ERROR: out of mem!\n");                            \
         }                                                                              \

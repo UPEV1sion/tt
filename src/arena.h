@@ -71,8 +71,7 @@ ARDEF void *arena_alloc(Arena *arena, size_t size)
     if (arena->next) return arena_alloc(arena->next, size);
 
     size_t new_size = arena->capacity * ARENA_GROW_SIZE;
-    while (new_size <= size)
-        new_size *= ARENA_GROW_SIZE;
+    while (new_size <= size) new_size *= ARENA_GROW_SIZE;
     arena->next = arena_new(new_size);
     if (!arena->next) return NULL;
 

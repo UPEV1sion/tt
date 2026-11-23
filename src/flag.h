@@ -92,8 +92,7 @@ FLAGDEF bool flag_seen(Flags *flags, const char *short_flag, const char *long_fl
         if ((expected) > (da)->capacity)                                               \
         {                                                                              \
             if ((da)->capacity == 0) (da)->capacity = FLAG__DA_INIT_CAP;               \
-            while ((expected) > (da)->capacity)                                        \
-                (da)->capacity *= FLAG__DA_GROW_SIZE;                                  \
+            while ((expected) > (da)->capacity) (da)->capacity *= FLAG__DA_GROW_SIZE;  \
             (da)->items = realloc((da)->items, (da)->capacity * sizeof(*(da)->items)); \
             assert((da)->items && "ERROR: out of mem!\n");                             \
         }                                                                              \
