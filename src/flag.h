@@ -1,12 +1,12 @@
 #ifndef FLAG_H_
 #define FLAG_H_
 
+#include <assert.h>
 #include <stdbool.h>
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 #include <string.h>
 
 #ifndef FLAGDEF
@@ -91,9 +91,9 @@ FLAGDEF bool flag_seen(Flags *flags, const char *short_flag, const char *long_fl
     {                                                                                  \
         if ((expected) > (da)->capacity)                                               \
         {                                                                              \
-            if ((da)->capacity == 0) (da)->capacity = FLAG__DA_INIT_CAP;                     \
+            if ((da)->capacity == 0) (da)->capacity = FLAG__DA_INIT_CAP;               \
             while ((expected) > (da)->capacity)                                        \
-                (da)->capacity *= FLAG__DA_GROW_SIZE;                                        \
+                (da)->capacity *= FLAG__DA_GROW_SIZE;                                  \
             (da)->items = realloc((da)->items, (da)->capacity * sizeof(*(da)->items)); \
             assert((da)->items && "ERROR: out of mem!\n");                             \
         }                                                                              \
@@ -113,8 +113,11 @@ FLAGDEF bool flag_seen(Flags *flags, const char *short_flag, const char *long_fl
 #define FLAG__ALPHABET_SIZE 256
 #define flag__shift_args(argc, argv) ((argc)--, *(argv)++)
 
-FLAGDEF Flag
-flag__new_flag_bool(bool *val, const char *short_flag, const char *long_flag, bool default_val, const char *description)
+FLAGDEF Flag flag__new_flag_bool(bool *val,
+                                 const char *short_flag,
+                                 const char *long_flag,
+                                 const bool default_val,
+                                 const char *description)
 {
     return (Flag){
         .type        = FLAG_BOOL,
@@ -145,7 +148,7 @@ FLAGDEF Flag flag__new_flag_str(char **val,
 FLAGDEF Flag flag__new_flag_int(int64_t *val,
                                 const char *short_flag,
                                 const char *long_flag,
-                                int64_t default_val,
+                                const int64_t default_val,
                                 const char *description)
 {
     return (Flag){
@@ -161,7 +164,7 @@ FLAGDEF Flag flag__new_flag_int(int64_t *val,
 FLAGDEF Flag flag__new_flag_uint(uint64_t *val,
                                  const char *short_flag,
                                  const char *long_flag,
-                                 uint64_t default_val,
+                                 const uint64_t default_val,
                                  const char *description)
 {
     return (Flag){
@@ -177,7 +180,7 @@ FLAGDEF Flag flag__new_flag_uint(uint64_t *val,
 FLAGDEF Flag flag__new_flag_double(double *val,
                                    const char *short_flag,
                                    const char *long_flag,
-                                   double default_val,
+                                   const double default_val,
                                    const char *description)
 {
     return (Flag){
@@ -341,7 +344,7 @@ FLAGDEF int apply_flag_val(Flag *f, const char *flag_label, int *argc, char ***a
         else
         {
             *(bool *)f->user_ptr = true;
-            f->seen = true;
+            f->seen              = true;
             return 0;
         }
     }
@@ -457,7 +460,7 @@ FLAGDEF int flag_parse(Flags *flags, int argc, char **argv)
                 else
                 {
                     *(bool *)f->user_ptr = true;
-                    f->seen = true;
+                    f->seen              = true;
                     continue;
                 }
             }
@@ -486,7 +489,7 @@ FLAGDEF int flag_parse(Flags *flags, int argc, char **argv)
                 return 1;
             }
             *(bool *)f->user_ptr = true;
-            f->seen = true;
+            f->seen              = true;
         }
     }
 
@@ -527,15 +530,16 @@ FLAGDEF bool flag_seen(Flags *flags, const char *short_flag, const char *long_fl
 {
     flag__da_foreach(Flag, flag, flags)
     {
-        const bool short_matches = (short_flag && flag->short_flag) &&
-                                   (0 == strcmp(flag->short_flag, short_flag));
-        const bool long_matches  = (long_flag && flag->long_flag) &&
-                                   (0 == strcmp(flag->long_flag, long_flag));
-        if(short_flag && long_flag && (short_matches ^ long_matches))
+        const bool short_matches = (short_flag && flag->short_flag) && (0 == strcmp(flag->short_flag, short_flag));
+        const bool long_matches  = (long_flag && flag->long_flag) && (0 == strcmp(flag->long_flag, long_flag));
+        if (short_flag && long_flag && (short_matches ^ long_matches))
         {
-            fprintf(stderr, "WARNING: flag inconsistency detected! '%s' and '%s' do not match the declared flag!\n", short_flag, long_flag);
+            fprintf(stderr,
+                    "WARNING: flag inconsistency detected! '%s' and '%s' do not match the declared flag!\n",
+                    short_flag,
+                    long_flag);
         }
-        if(short_matches || long_matches) return flag->seen;
+        if (short_matches || long_matches) return flag->seen;
     }
 
     return false;

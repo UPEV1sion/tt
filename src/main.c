@@ -161,8 +161,7 @@ static Task parse_task(char *id)
             else
             {
                 fprintf(stderr, "ERROR: Malfromed \"STATUS\" header in %s\n", path);
-                fprintf(stderr, "ERROR: Available options: \"OPEN\", "
-                                "\"IN_PROGRESS\", \"CLOSED\"\n");
+                fprintf(stderr, "ERROR: Available options: \"OPEN\", \"IN_PROGRESS\", \"CLOSED\"\n");
                 exit(1);
             }
         }
@@ -411,8 +410,9 @@ static void create_new_task(void)
     if (!valid_state)
     {
         fprintf(stderr, "ERROR: invalid status \"%s\"\n", status);
-        fprintf(stderr, "ERROR: Available options: \"OPEN\", \"IN_PROGRESS\", "
-                        "\"CLOSED\"\n");
+        fprintf(stderr,
+                "ERROR: Available options: \"OPEN\", \"IN_PROGRESS\", "
+                "\"CLOSED\"\n");
         exit(1);
     }
 
@@ -462,38 +462,27 @@ static void print_usage(const char *program)
     printf("USAGE: %s <subcommand> [options]\n\n", program);
     printf("SUBCOMMANDS:\n");
     printf("    new                        Create a new task interactively\n");
-    printf("    list [options]             List, sort, and filter active tasks "
-           "(default)\n");
+    printf("    list [options]             List, sort, and filter active tasks (default)\n");
     printf("    edit <task-id> [options]   Modify an existing task's metadata\n");
     printf("    help                       Print this help menu\n\n");
 
     printf("OPTIONS FOR \"list\":\n");
     printf("    -d, --date                 Sort by creation date (descending)\n");
-    printf("    -p, --priority             Sort by priority (descending, "
-           "default)\n");
-    printf("    -t, --topological          Sort refereces by topological "
-           "ordering (descending)\n");
-    printf("    -r, --reverse              Reverse the sorting order "
-           "(ascending)\n");
+    printf("    -p, --priority             Sort by priority (descending, default)\n");
+    printf("    -t, --topological          Sort refereces by topological ordering (descending)\n");
+    printf("    -r, --reverse              Reverse the sorting order (ascending)\n");
     printf("    -f, --filter <query>       Filter tasks using a query string\n");
-    printf("    -a, --all                  Display all tasks, even the closed "
-           "ones\n");
+    printf("    -a, --all                  Display all tasks, even the closed ones\n");
     printf("    -v, --verbose              Display the whole task file\n");
-    printf("                               Syntax:  '.<tag>', 'and', 'or', "
-           "'not', 'tagged', 'untagged', '(', ')'\n");
-    printf("                               Example: list -f \".bug or "
-           "untagged\"\n\n");
+    printf("                               Syntax:  '.<tag>', 'and', 'or', 'not', 'tagged', 'untagged', '(', ')'\n");
+    printf("                               Example: list -f \".bug or untagged\"\n\n");
 
     printf("OPTIONS FOR \"edit\":\n");
-    printf("    -s, --status <STATUS>      Set task status (OPEN, IN_PROGRESS, "
-           "CLOSED)\n");
+    printf("    -s, --status <STATUS>      Set task status (OPEN, IN_PROGRESS, CLOSED)\n");
     printf("    -p, --priority <0-100>     Set task priority\n");
-    printf("    -t, --tags <tags>          Overwrite task tags "
-           "(comma-separated)\n");
-    printf("    -r, --references <refs>    Overwrite task references "
-           "(comma-separated)\n");
-    printf("                               Example: edit 20260328-085723 -s "
-           "IN_PROGRESS -p 80\n");
+    printf("    -t, --tags <tags>          Overwrite task tags comma-separated)\n");
+    printf("    -r, --references <refs>    Overwrite task references (comma-separated)\n");
+    printf("                               Example: edit 20260328-085723 -s IN_PROGRESS -p 80\n");
 }
 
 static SortOptions sort_options = {.desc = true, .target = SORT_PRIO};
@@ -543,7 +532,8 @@ static void sort_topological(Tasks *tasks)
     for (size_t i = 0; i < n; ++i)
     {
         StringView id_sv = sv_from_cstr(tasks->items[i].id);
-        assertmsg(ht_insert(&id_to_idx, id_sv, i) == 0, "ERROR: duplicate or failed task ID insert: %s\n",
+        assertmsg(ht_insert(&id_to_idx, id_sv, i) == 0,
+                  "ERROR: duplicate or failed task ID insert: %s\n",
                   tasks->items[i].id);
     }
 
@@ -561,7 +551,9 @@ static void sort_topological(Tasks *tasks)
             size_t target_idx = 0;
             if (ht_lookup(&id_to_idx, *ref, &target_idx) != 0)
             {
-                fprintf(stderr, "ERROR: task '%s' references unknown task '" SV_FMT "'\n", tasks->items[i].id,
+                fprintf(stderr,
+                        "ERROR: task '%s' references unknown task '" SV_FMT "'\n",
+                        tasks->items[i].id,
                         SV_ARG(*ref));
                 goto err;
             }
@@ -736,8 +728,7 @@ static int edit_tasks(int argc, char **argv)
                 0 != strcmp(new_status, "CLOSED"))
             {
                 fprintf(stderr, "ERROR: Invalid status \"%s\"\n", new_status);
-                fprintf(stderr, "ERROR: Available options: \"OPEN\", "
-                                "\"IN_PROGRESS\", \"CLOSED\"\n");
+                fprintf(stderr, "ERROR: Available options: \"OPEN\", \"IN_PROGRESS\", \"CLOSED\"\n");
                 return 1;
             }
         }

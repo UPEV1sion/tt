@@ -30,7 +30,11 @@ struct {
     TokenType type;
     const char *lexeme;
 } keywords[] = {
-    {TOK_OR, "or"}, {TOK_AND, "and"}, {TOK_NOT, "not"}, {TOK_TAGGED, "tagged"}, {TOK_UNTAGGED, "untagged"},
+    {TOK_OR, "or"},
+    {TOK_AND, "and"},
+    {TOK_NOT, "not"},
+    {TOK_TAGGED, "tagged"},
+    {TOK_UNTAGGED, "untagged"},
 };
 
 typedef struct {
@@ -248,10 +252,12 @@ static void parse_primary(Lexer *lexer, Ops *ops)
     if (match(lexer, TOK_ID))
     {
         const Token id = lexer->last_tok;
-        error(lexer->input, id.pos,
+        error(lexer->input,
+              id.pos,
               "ERROR: unknown identifier \"%s\". Tags need a '.' prefix, did "
               "you mean \".%s\"?\n",
-              id.lexeme, id.lexeme);
+              id.lexeme,
+              id.lexeme);
         // const Op op = op_new(OP_ID, lexer->last_tok.lexeme);
         // da_append(ops, op);
         // return;

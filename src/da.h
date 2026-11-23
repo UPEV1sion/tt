@@ -79,28 +79,28 @@ typedef struct {
 
 #define da_free(da) free((da)->items)
 
-#ifndef DA_DEF
-#define DA_DEF
-#endif // DA_DEF
+#ifndef DADEF
+#define DADEF
+#endif // DADEF
 
-DA_DEF StringView sv_from_sb(const StringBuilder *sb);
-DA_DEF StringView sv_chop(StringView *sv, int delim);
-DA_DEF bool sv_equal(StringView sv1, StringView sv2);
-DA_DEF int sv_cmp(StringView sv1, StringView sv2);
-DA_DEF bool sv_is_prefix(StringView sv, const char *prefix);
-DA_DEF StringView sv_trim(StringView sv);
-DA_DEF char *cstr_from_sv(StringView sv);
-DA_DEF StringView sv_from_cstr(const char *s);
-DA_DEF int read_file(StringBuilder *sb, const char *path);
+DADEF StringView sv_from_sb(const StringBuilder *sb);
+DADEF StringView sv_chop(StringView *sv, int delim);
+DADEF bool sv_equal(StringView sv1, StringView sv2);
+DADEF int sv_cmp(StringView sv1, StringView sv2);
+DADEF bool sv_is_prefix(StringView sv, const char *prefix);
+DADEF StringView sv_trim(StringView sv);
+DADEF char *cstr_from_sv(StringView sv);
+DADEF StringView sv_from_cstr(const char *s);
+DADEF int read_file(StringBuilder *sb, const char *path);
 
 #ifdef DA_IMPLEMENTATION
 
-DA_DEF StringView sv_from_sb(const StringBuilder *sb)
+DADEF StringView sv_from_sb(const StringBuilder *sb)
 {
     return (StringView){.s = sb->items, .len = sb->count};
 }
 
-DA_DEF StringView sv_chop(StringView *sv, const int delim)
+DADEF StringView sv_chop(StringView *sv, const int delim)
 {
     if (sv->len == 0) return (StringView){NULL, 0};
 
@@ -126,12 +126,12 @@ DA_DEF StringView sv_chop(StringView *sv, const int delim)
     return ret;
 }
 
-DA_DEF bool sv_equal(const StringView sv1, const StringView sv2)
+DADEF bool sv_equal(const StringView sv1, const StringView sv2)
 {
     return sv_cmp(sv1, sv2) == 0;
 }
 
-DA_DEF int sv_cmp(const StringView sv1, const StringView sv2)
+DADEF int sv_cmp(const StringView sv1, const StringView sv2)
 {
     const size_t min_len = sv1.len < sv2.len ? sv1.len : sv2.len;
 
@@ -143,7 +143,7 @@ DA_DEF int sv_cmp(const StringView sv1, const StringView sv2)
     return 0;
 }
 
-DA_DEF bool sv_is_prefix(const StringView sv, const char *prefix)
+DADEF bool sv_is_prefix(const StringView sv, const char *prefix)
 {
     const size_t len = strlen(prefix);
     if (sv.len < len) return false;
@@ -156,7 +156,7 @@ DA_DEF bool sv_is_prefix(const StringView sv, const char *prefix)
     return true;
 }
 
-DA_DEF StringView sv_trim(StringView sv)
+DADEF StringView sv_trim(StringView sv)
 {
     while (sv.len > 0 && isspace((unsigned char)*sv.s))
     {
@@ -172,7 +172,7 @@ DA_DEF StringView sv_trim(StringView sv)
     return sv;
 }
 
-DA_DEF char *cstr_from_sv(const StringView sv)
+DADEF char *cstr_from_sv(const StringView sv)
 {
     char *str;
     assertmsg((str = malloc(sv.len + 1)) != NULL, "ERROR: Could not allocate cstr\n");
@@ -181,13 +181,13 @@ DA_DEF char *cstr_from_sv(const StringView sv)
     return str;
 }
 
-DA_DEF StringView sv_from_cstr(const char *s)
+DADEF StringView sv_from_cstr(const char *s)
 {
     if (!s) return (StringView){0};
     return (StringView){.s = s, .len = strlen(s)};
 }
 
-DA_DEF int read_file(StringBuilder *sb, const char *path)
+DADEF int read_file(StringBuilder *sb, const char *path)
 {
     FILE *f = fopen(path, "rb");
     assertmsg(f != NULL, "ERROR: Could not open file %s\n", path);
