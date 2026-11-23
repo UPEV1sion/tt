@@ -628,6 +628,7 @@ static int list_tasks(int argc, char **argv)
     flag_decl_bool(&flags, &all_tasks, "-a", "--all",         false, "Display all tasks, even the closed ones");
     flag_decl_bool(&flags, &verbose,   "-v", "--verbose",     false, "Display the whole task file");
     flag_decl_bool(&flags, &help,      "-h", "--help",        false, "Display help for the list subcommand");
+    assert(flags.count == 8 && "flags changed, remember to change README and print_usage!");
     if (flag_parse(&flags, argc, argv) != 0)
     {
         flag_print_info(&flags, "LIST FLAGS");
@@ -716,6 +717,7 @@ static int edit_tasks(int argc, char **argv)
     flag_decl_str(&flags,  &new_tags,   "-t", "--tags",       NULL,  "Override tasks tags (comma-separated)");
     flag_decl_str(&flags,  &new_refs,   "-r", "--references", NULL,  "Override tasks references (comma-separated)");
     flag_decl_bool(&flags, &help,       "-h", "--help",       false, "Display help for the edit subcommand");
+    assert(flags.count == 5 && "flags changed, remember to change README and print_usage!");
     if(flag_parse(&flags, argc, argv) != 0)
     {
         flag_print_info(&flags, "EDIT FLAGS");
