@@ -12,7 +12,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "common.h"
 #include "da.h"
@@ -782,7 +784,9 @@ static int edit_tasks(int argc, char **argv)
     flag_free(&flags);
 
     char path[BUFSIZE];
+    char tmp_path[BUFSIZE];
     snprintf(path, sizeof(path), "./tasks/%s/TASK.md", task_id);
+    snprintf(tmp_path, sizeof(tmp_path), "./tasks/%s/TASK.md.tmp", task_id);
 
     StringBuilder sb = {0};
     read_file(&sb, path);
@@ -867,10 +871,34 @@ static int edit_tasks(int argc, char **argv)
 
     if (!preamble_passed) append_missing(&output, new_tags, has_tags, new_refs, has_refs);
 
-    FILE *fp = fopen(path, "w");
-    assertmsg(fp != NULL, "ERROR: Could not write to file\n");
-    fwrite(output.items, 1, output.count, fp);
-    fclose(fp);
+    FILE *fp = fopen(tmp_path, "wb");
+    if (!fp)
+    {
+        fprintf(stderr, "ERROR: Could not create temp file \"%s\": %s\n", tmp_path, strerror(errno));
+        return 1;
+    }
+
+    if (fwrite(output.items, 1, output.count, fp) != output.count)
+    {
+        fprintf(stderr, "ERROR: Could not write to temp file \"%s\": %s\n", tmp_path, strerror(errno));
+        fclose(fp);
+        unlink(tmp_path);
+        return 1;
+    }
+
+    if (fclose(fp) != 0)
+    {
+        fprintf(stderr, "ERROR: Could not close temp file \"%s\": %s\n", tmp_path, strerror(errno));
+        unlink(tmp_path);
+        return 1;
+    }
+
+    if (rename(tmp_path, path) != 0)
+    {
+        fprintf(stderr, "ERROR: Could not replace \"%s\" with \"%s\": %s\n", path, tmp_path, strerror(errno));
+        unlink(tmp_path);
+        return 1;
+    }
 
     printf("SUCCESS: Updated task %s\n", task_id);
 
