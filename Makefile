@@ -6,13 +6,13 @@ DESTDIR  := build
 TARGET   := tt
 
 SRC      := src/main.c src/parser.c src/common.c
-HDR_MODS := da ht arena
+HDR_MODS := da ht arena flag
 C_OBJS   := $(patsubst src/%.c,$(DESTDIR)/%.o,$(SRC))
 H_OBJS   := $(patsubst %,$(DESTDIR)/%.o,$(HDR_MODS))
 OBJS     := $(H_OBJS) $(C_OBJS)
 DEPS     := $(OBJS:.o=.d)
 
-.PHONY: all install clean test
+.PHONY: all install clean test fmt
 
 all: $(TARGET) test
 
@@ -28,6 +28,9 @@ $(DESTDIR)/ht.o: src/ht.h | $(DESTDIR)
 $(DESTDIR)/arena.o: src/arena.h | $(DESTDIR)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -xc -c -DARENA_IMPLEMENTATION -o $@ $<
 
+$(DESTDIR)/flag.o: src/flag.h | $(DESTDIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -xc -c -DFLAG_IMPLEMENTATION -o $@ $<
+
 $(DESTDIR)/%.o: src/%.c | $(DESTDIR)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
 
@@ -38,6 +41,9 @@ $(TARGET): $(OBJS)
 
 test:
 	pytest ./tests
+
+fmt:
+	git ls-files '*.c' '*.h' | xargs clang-format -i
 
 install:
 	mkdir -p $(DESTDIR)/bin

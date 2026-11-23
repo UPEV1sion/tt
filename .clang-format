@@ -1,0 +1,46 @@
+---
+AttributeMacros:
+  - FLAGDEF
+  - DADEF
+
+Language: Cpp
+BasedOnStyle: LLVM
+IndentWidth: 4
+TabWidth: 4
+ColumnLimit: 120
+UseTab: Never
+BreakStringLiterals: false
+AllowShortBlocksOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+AllowShortFunctionsOnASingleLine: None
+AllowShortEnumsOnASingleLine: true
+KeepEmptyLinesAtTheStartOfBlocks: true
+SortUsingDeclarations: false
+BreakBeforeBraces: Custom
+AlignEscapedNewlines: Left
+BinPackArguments: false
+BinPackParameters: false
+AllowAllParametersOfDeclarationOnNextLine: false
+AlignAfterOpenBracket: Align
+BreakAfterReturnType: Automatic
+PenaltyReturnTypeOnItsOwnLine: 50000
+AlignConsecutiveAssignments:
+  Enabled: true
+  AcrossComments: true
+AllowShortCaseLabelsOnASingleLine: true
+AlignConsecutiveShortCaseStatements:
+  Enabled: true
+  AcrossEmptyLines: false
+  AcrossComments: false
+BraceWrapping:
+  AfterFunction: true
+  AfterControlStatement: true
+  BeforeElse: true
+  BeforeCatch: true
+  AfterClass: true
+  AfterNamespace: true
+  AfterEnum: false
+  AfterStruct: false
+  AfterUnion: false
+...
+

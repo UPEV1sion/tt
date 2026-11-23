@@ -10,4 +10,5 @@
 !LICENSE
 !Makefile
 !.gitignore
+!.clang-format
 !**/

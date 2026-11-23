@@ -7,12 +7,12 @@
 
 #include <stddef.h>
 
-#define OP_LIST\
-    X(OP_AND) \
-    X(OP_OR) \
-    X(OP_NOT) \
-    X(OP_TAG) \
-    X(OP_TAGGED) \
+#define OP_LIST    \
+    X(OP_AND)      \
+    X(OP_OR)       \
+    X(OP_NOT)      \
+    X(OP_TAG)      \
+    X(OP_TAGGED)   \
     X(OP_UNTAGGED) \
     X(OP_ID)
 
@@ -35,9 +35,9 @@ typedef struct {
 
 typedef struct Lexer Lexer;
 
-Lexer* lexer_new(const char *source_code);
+Lexer *lexer_new(const char *source_code);
 void lexer_free(Lexer *lexer);
 void parse_expr(Lexer *lexer, Ops *ops);
-char* op_to_str(Op op);
+char *op_to_str(Op op);
 
 #endif // PARSER_H_

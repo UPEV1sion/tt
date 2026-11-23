@@ -5,15 +5,15 @@
 #ifndef DA_H_
 #define DA_H_
 
-#include <string.h>
+#include <ctype.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include <ctype.h>
+#include <string.h>
 
 #include "common.h"
 
 #define SV_FMT "%.*s"
-#define SV_ARG(sv) (int) (sv).len, (sv).s
+#define SV_ARG(sv) (int)(sv).len, (sv).s
 
 typedef struct {
     size_t count;
@@ -29,89 +29,90 @@ typedef struct {
 #define DA_GROW_SIZE 2
 #define DA_INIT_CAP 64
 
-#define da_reserve(da, expected) \
-    do { \
-        if((expected) > (da)->capacity) { \
-            if((da)->capacity == 0) (da)->capacity = DA_INIT_CAP; \
-            while((expected) > (da)->capacity) (da)->capacity *= DA_GROW_SIZE; \
+#define da_reserve(da, expected)                                                       \
+    do                                                                                 \
+    {                                                                                  \
+        if ((expected) > (da)->capacity)                                               \
+        {                                                                              \
+            if ((da)->capacity == 0) (da)->capacity = DA_INIT_CAP;                     \
+            while ((expected) > (da)->capacity)                                        \
+                (da)->capacity *= DA_GROW_SIZE;                                        \
             (da)->items = realloc((da)->items, (da)->capacity * sizeof(*(da)->items)); \
-            assertmsg((da)->items, "ERROR: out of mem!\n"); \
-        } \
-    } while(0)
+            assertmsg((da)->items, "ERROR: out of mem!\n");                            \
+        }                                                                              \
+    } while (0)
 
-#define da_append(da, item) \
-    do { \
-        da_reserve((da), (da)->count + 1); \
+#define da_append(da, item)                  \
+    do                                       \
+    {                                        \
+        da_reserve((da), (da)->count + 1);   \
         (da)->items[(da)->count++] = (item); \
-    } while(0)
+    } while (0)
 
-#define da_append_many(da, item, sz) \
-    do { \
-        da_reserve((da), (da)->count + (sz)); \
+#define da_append_many(da, item, sz)                     \
+    do                                                   \
+    {                                                    \
+        da_reserve((da), (da)->count + (sz));            \
         memcpy((da)->items + (da)->count, (item), (sz)); \
-        (da)->count += sz; \
-     } while(0) 
+        (da)->count += sz;                               \
+    } while (0)
 
-#define sb_append(sb, s) \
-    do { \
-        const size_t len = strlen(s); \
-        da_reserve((sb), (sb)->count + len); \
+#define sb_append(sb, s)                             \
+    do                                               \
+    {                                                \
+        const size_t len = strlen(s);                \
+        da_reserve((sb), (sb)->count + len);         \
         memcpy((sb)->items + (sb)->count, (s), len); \
-        (sb)->count += len; \
-    } while(0)
+        (sb)->count += len;                          \
+    } while (0)
 
-#define da_foreach(type, name, da) for(type *name = (da)->items; name < (da)->items + (da)->count; ++name)
+#define da_foreach(type, name, da) for (type *name = (da)->items; name < (da)->items + (da)->count; ++name)
 
 #define da_sort(da, cmp) qsort((da)->items, (da)->count, sizeof(*(da)->items), cmp)
 
-#define da_remove_unordered(da, idx) \
-    do { \
+#define da_remove_unordered(da, idx)                                  \
+    do                                                                \
+    {                                                                 \
         assertmsg(idx < (da)->count, "ERROR: index out of bound!\n"); \
-        (da)->items[idx] = (da)->items[--(da)->count];  \
-    } while(0)
+        (da)->items[idx] = (da)->items[--(da)->count];                \
+    } while (0)
 
-#define da_free(da) \
-    do { \
-        free((da)->items); \
-    } while(0)
+#define da_free(da) free((da)->items)
 
-#ifndef DA_DEF
-#define DA_DEF
-#endif // DA_DEF
+#ifndef DADEF
+#define DADEF
+#endif // DADEF
 
-DA_DEF StringView sv_from_sb(const StringBuilder *sb);
-DA_DEF StringView sv_chop(StringView *sv, int delim);
-DA_DEF bool sv_equal(StringView sv1, StringView sv2);
-DA_DEF int sv_cmp(StringView sv1, StringView sv2);
-DA_DEF bool sv_is_prefix(StringView sv, const char *prefix);
-DA_DEF StringView sv_trim(StringView sv);
-DA_DEF char* cstr_from_sv(StringView sv);
-DA_DEF StringView sv_from_cstr(const char *s);
-DA_DEF int read_file(StringBuilder *sb, const char *path);
+DADEF StringView sv_from_sb(const StringBuilder *sb);
+DADEF StringView sv_chop(StringView *sv, int delim);
+DADEF bool sv_equal(StringView sv1, StringView sv2);
+DADEF int sv_cmp(StringView sv1, StringView sv2);
+DADEF bool sv_is_prefix(StringView sv, const char *prefix);
+DADEF StringView sv_trim(StringView sv);
+DADEF char *cstr_from_sv(StringView sv);
+DADEF StringView sv_from_cstr(const char *s);
+DADEF int read_file(StringBuilder *sb, const char *path);
 
 #ifdef DA_IMPLEMENTATION
 
-DA_DEF StringView sv_from_sb(const StringBuilder *sb)
+DADEF StringView sv_from_sb(const StringBuilder *sb)
 {
-    return (StringView) {
-        .s = sb->items,
-        .len = sb->count
-    };
+    return (StringView){.s = sb->items, .len = sb->count};
 }
 
-DA_DEF StringView sv_chop(StringView *sv, const int delim)
+DADEF StringView sv_chop(StringView *sv, const int delim)
 {
-    if(sv->len == 0) return (StringView){NULL, 0};
+    if (sv->len == 0) return (StringView){NULL, 0};
 
     size_t i;
-    for(i = 0; i < sv->len; ++i) {
-        if((unsigned char)sv->s[i] == (unsigned char)delim)
-            break;
+    for (i = 0; i < sv->len; ++i)
+    {
+        if ((unsigned char)sv->s[i] == (unsigned char)delim) break;
     }
 
     const StringView ret = {sv->s, i};
 
-    if(i < sv->len)
+    if (i < sv->len)
     {
         sv->s += i + 1;
         sv->len -= i + 1;
@@ -125,12 +126,12 @@ DA_DEF StringView sv_chop(StringView *sv, const int delim)
     return ret;
 }
 
-DA_DEF bool sv_equal(const StringView sv1, const StringView sv2)
+DADEF bool sv_equal(const StringView sv1, const StringView sv2)
 {
     return sv_cmp(sv1, sv2) == 0;
 }
 
-DA_DEF int sv_cmp(const StringView sv1, const StringView sv2)
+DADEF int sv_cmp(const StringView sv1, const StringView sv2)
 {
     const size_t min_len = sv1.len < sv2.len ? sv1.len : sv2.len;
 
@@ -142,28 +143,28 @@ DA_DEF int sv_cmp(const StringView sv1, const StringView sv2)
     return 0;
 }
 
-DA_DEF bool sv_is_prefix(const StringView sv, const char *prefix)
+DADEF bool sv_is_prefix(const StringView sv, const char *prefix)
 {
     const size_t len = strlen(prefix);
-    if(sv.len < len) return false;
+    if (sv.len < len) return false;
 
-    for(size_t i = 0; i < len; ++i)
+    for (size_t i = 0; i < len; ++i)
     {
-        if(sv.s[i] != prefix[i]) return false;
+        if (sv.s[i] != prefix[i]) return false;
     }
 
     return true;
 }
 
-DA_DEF StringView sv_trim(StringView sv)
+DADEF StringView sv_trim(StringView sv)
 {
-    while(sv.len > 0 && isspace((unsigned char) *sv.s))
+    while (sv.len > 0 && isspace((unsigned char)*sv.s))
     {
         sv.s++;
         sv.len--;
     }
 
-    while(sv.len > 0 && isspace((unsigned char) sv.s[sv.len - 1]))
+    while (sv.len > 0 && isspace((unsigned char)sv.s[sv.len - 1]))
     {
         sv.len--;
     }
@@ -171,7 +172,7 @@ DA_DEF StringView sv_trim(StringView sv)
     return sv;
 }
 
-DA_DEF char* cstr_from_sv(const StringView sv)
+DADEF char *cstr_from_sv(const StringView sv)
 {
     char *str;
     assertmsg((str = malloc(sv.len + 1)) != NULL, "ERROR: Could not allocate cstr\n");
@@ -180,16 +181,13 @@ DA_DEF char* cstr_from_sv(const StringView sv)
     return str;
 }
 
-DA_DEF StringView sv_from_cstr(const char *s)
+DADEF StringView sv_from_cstr(const char *s)
 {
-    if (!s) return (StringView) {0};
-    return (StringView) {
-        .s = s,
-        .len = strlen(s)
-    };
+    if (!s) return (StringView){0};
+    return (StringView){.s = s, .len = strlen(s)};
 }
 
-DA_DEF int read_file(StringBuilder *sb, const char *path)
+DADEF int read_file(StringBuilder *sb, const char *path)
 {
     FILE *f = fopen(path, "rb");
     assertmsg(f != NULL, "ERROR: Could not open file %s\n", path);
@@ -202,12 +200,7 @@ DA_DEF int read_file(StringBuilder *sb, const char *path)
     size_t total_read = 0;
     while (total_read < (size_t)size)
     {
-        const size_t n = fread(
-            sb->items + sb->count + total_read,
-            1,
-            (size_t)size - total_read,
-            f
-        );
+        const size_t n = fread(sb->items + sb->count + total_read, 1, (size_t)size - total_read, f);
 
         if (n == 0)
         {
