@@ -5,14 +5,14 @@ CPPFLAGS := -MMD -MP
 DESTDIR  := build
 TARGET   := tt
 
-SRC      := src/main.c src/parser.c src/common.c
+SRC      := src/main.c src/filter.c src/common.c src/task.c
 HDR_MODS := da ht arena flag
 C_OBJS   := $(patsubst src/%.c,$(DESTDIR)/%.o,$(SRC))
 H_OBJS   := $(patsubst %,$(DESTDIR)/%.o,$(HDR_MODS))
 OBJS     := $(H_OBJS) $(C_OBJS)
 DEPS     := $(OBJS:.o=.d)
 
-.PHONY: all install clean test fmt
+.PHONY: all install clean test fmt tidy
 
 all: $(TARGET) test
 
@@ -44,6 +44,9 @@ test: $(TARGET)
 
 fmt:
 	git ls-files '*.c' '*.h' | xargs clang-format -i
+
+tidy:
+	clang-tidy --quiet $(SRC) -- $(CPPFLAGS) $(CFLAGS)
 
 install:
 	mkdir -p $(DESTDIR)/bin

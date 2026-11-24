@@ -1,8 +1,4 @@
 ---
-AttributeMacros:
-  - FLAGDEF
-  - DADEF
-
 Language: Cpp
 BasedOnStyle: LLVM
 IndentWidth: 4
@@ -43,5 +39,7 @@ BraceWrapping:
   AfterEnum: false
   AfterStruct: false
   AfterUnion: false
+AttributeMacros:
+  - FLAGDEF
+  - DADEF
 ...
-

@@ -11,4 +11,5 @@
 !Makefile
 !.gitignore
 !.clang-format
+!.clang-tidy
 !**/

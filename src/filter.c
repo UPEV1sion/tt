@@ -2,15 +2,12 @@
 // Created by escha on 28.03.26.
 //
 
-#include <ctype.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 #include "arena.h"
 #include "common.h"
 #include "da.h"
-#include "parser.h"
+#include "task.h"
+#include "filter.h"
 
 #define error(input, caret_pos, ...)                   \
     do                                                 \
@@ -35,7 +32,7 @@ typedef enum {
     TOK_INVALID,
 } TokenType;
 
-struct {
+static struct {
     TokenType type;
     const char *lexeme;
 } keywords[] = {
@@ -159,10 +156,7 @@ static Token lexer_next_tok(Lexer *lexer)
             {
                 error(lexer->input, lexer->pos, "ERROR: invalid character '%c'\n", lexer->cur_char);
             }
-            else
-            {
-                error(lexer->input, lexer->pos, "ERROR: invalid character 0x%02x\n", lexer->cur_char);
-            }
+            error(lexer->input, lexer->pos, "ERROR: invalid character 0x%02x\n", lexer->cur_char);
         }
     }
     break;
@@ -175,9 +169,7 @@ static Token lexer_next_tok(Lexer *lexer)
 
 Lexer *lexer_new(const char *source_code)
 {
-    Lexer *lexer = NULL;
-
-    lexer = calloc(1, sizeof(Lexer));
+    Lexer *lexer = calloc(1, sizeof(Lexer));
     if (!lexer) goto err;
 
     lexer->arena = arena_new(1024);
@@ -371,3 +363,77 @@ void parse_expr(Lexer *lexer, Ops *ops)
         error(lexer->input, t.pos, "ERROR: unexpected token \"%s\" at end of expression\n", text);
     }
 }
+
+bool task_matches_filter(const Task task, const Ops *ops, Stack *stack)
+{
+    da_foreach(Op, op, ops)
+    {
+        switch (op->code)
+        {
+        case OP_AND: {
+            assertmsg(stack->count >= 2, "ERROR: stack underflow\n");
+            const bool a = stack->items[stack->count - 1];
+            const bool b = stack->items[stack->count - 2];
+            stack->count -= 2;
+            da_append(stack, a && b);
+        }
+        break;
+        case OP_OR: {
+            assertmsg(stack->count >= 2, "ERROR: stack underflow\n");
+            const bool a = stack->items[stack->count - 1];
+            const bool b = stack->items[stack->count - 2];
+            stack->count -= 2;
+            da_append(stack, a || b);
+        }
+        break;
+        case OP_NOT: {
+            assertmsg(stack->count >= 1, "ERROR: stack underflow\n");
+            stack->items[stack->count - 1] = !stack->items[stack->count - 1];
+        }
+        break;
+        case OP_TAG: {
+            const bool a = task_contains_tag(task, op->lexeme);
+            da_append(stack, a);
+        }
+        break;
+        case OP_TAGGED: {
+            da_append(stack, task.tags.count > 0);
+        }
+        break;
+        case OP_UNTAGGED: {
+            da_append(stack, task.tags.count == 0);
+        }
+        break;
+        case OP_ID: assertmsg(false, "TODO"); break;
+        default:    assertmsg(false, "UNREACHABLE\n"); break;
+        }
+    }
+
+    assertmsg(stack->count == 1, "ERROR: invalid filter evaluation\n");
+    return *stack->items;
+}
+
+void op_free(Ops *ops)
+{
+    da_foreach(Op, op, ops)
+    {
+        free(op->lexeme);
+    }
+    da_free(ops);
+}
+
+void filter_tasks(Tasks *tasks, Ops *ops)
+{
+    Stack stack = {0};
+    for (size_t i = tasks->count; i > 0; --i)
+    {
+        stack.count = 0;
+        if (!task_matches_filter(tasks->items[i - 1], ops, &stack))
+        {
+            free_task(tasks->items[i - 1]);
+            da_remove_unordered(tasks, i - 1);
+        }
+    }
+    da_free(&stack);
+}
+

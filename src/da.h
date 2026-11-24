@@ -9,6 +9,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 #include "common.h"
 
@@ -68,6 +69,23 @@ typedef struct {
 #define da_foreach(type, name, da) for (type *name = (da)->items; name < (da)->items + (da)->count; ++name)
 
 #define da_sort(da, cmp) qsort((da)->items, (da)->count, sizeof(*(da)->items), cmp)
+
+#define da_reverse(da)                                                              \
+    do                                                                              \
+    {                                                                               \
+        assert((da)->count > 0);                                                    \
+        size_t left  = 0;                                                           \
+        size_t right = (da)->count - 1;                                             \
+        while (left < right)                                                        \
+        {                                                                           \
+            uint8_t temp[sizeof(*(da)->items)];                                     \
+            memcpy(temp, (da)->items + left, sizeof(*(da)->items));                 \
+            memmove((da)->items + left, (da)->items + right, sizeof(*(da)->items)); \
+            memcpy((da)->items + left, temp, sizeof(*(da)->items));                 \
+            left++;                                                                 \
+            right--;                                                                \
+        }                                                                           \
+    } while (0)
 
 #define da_remove_unordered(da, idx)                                  \
     do                                                                \

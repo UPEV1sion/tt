@@ -1,4 +1,7 @@
 #include "common.h"
+#include <stddef.h>
+#include <string.h>
+#include <stdlib.h>
 
 #ifndef _GNU_SOURCE
 
