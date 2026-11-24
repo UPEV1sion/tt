@@ -1,11 +1,11 @@
 CC := gcc
 CFLAGS := -Wall -Wextra -Werror -Wconversion -Wformat=2 -pedantic -std=c17 -O3
-CPPFLAGS := -MMD -MP
+CPPFLAGS := -MMD -MP -D_POSIX_C_SOURCE=200809L
 
 DESTDIR  := build
 TARGET   := tt
 
-SRC      := src/main.c src/filter.c src/common.c src/task.c
+SRC      := src/main.c src/filter.c src/task.c
 HDR_MODS := da ht arena flag
 C_OBJS   := $(patsubst src/%.c,$(DESTDIR)/%.o,$(SRC))
 H_OBJS   := $(patsubst %,$(DESTDIR)/%.o,$(HDR_MODS))

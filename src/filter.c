@@ -424,14 +424,21 @@ void op_free(Ops *ops)
 void filter_tasks(Tasks *tasks, Ops *ops)
 {
     Stack stack = {0};
-    for (size_t i = tasks->count; i > 0; --i)
+    size_t kept = 0;
+
+    for (size_t i = 0; i < tasks->count; ++i)
     {
         stack.count = 0;
-        if (!task_matches_filter(tasks->items[i - 1], ops, &stack))
+        if (task_matches_filter(tasks->items[i], ops, &stack))
         {
-            free_task(tasks->items[i - 1]);
-            da_remove_unordered(tasks, i - 1);
+            tasks->items[kept++] = tasks->items[i];
+        }
+        else
+        {
+            free_task(tasks->items[i]);
         }
     }
+
+    tasks->count = kept;
     da_free(&stack);
 }

@@ -25,14 +25,4 @@
 
 #define BUFSIZE 1024
 
-#ifndef _GNU_SOURCE
-
-static_assert(sizeof(size_t) == sizeof(int64_t), "ERROR: 32 bit env detected, please compile this on a 64 bit machine");
-
-typedef int64_t ssize_t;
-
-char *strdup(const char *s);
-
-#endif // _GNU_SOURCE
-
 #endif // COMMON_H_

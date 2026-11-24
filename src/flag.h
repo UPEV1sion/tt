@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #ifndef FLAGDEF
 #define FLAGDEF
@@ -279,24 +280,27 @@ FLAGDEF bool flag__parse_arg(void *val, FlagType type, char *arg)
     break;
     case FLAG_DOUBLE: {
         char *endptr;
+        errno = 0;
         double d = strtod(arg, &endptr);
-        if (0 != *endptr) return false;
+        if (endptr == arg || 0 != *endptr || ERANGE == errno) return false;
         *(double *)val = d;
         return true;
     }
     break;
     case FLAG_INT: {
         char *endptr;
+        errno = 0;
         long long d = strtoll(arg, &endptr, 10);
-        if (0 != *endptr) return false;
+        if (endptr == arg || 0 != *endptr || ERANGE == errno) return false;
         *(int64_t *)val = d;
         return true;
     }
     break;
     case FLAG_UINT: {
         char *endptr;
+        errno = 0;
         unsigned long long d = strtoull(arg, &endptr, 10);
-        if (0 != *endptr) return false;
+        if (endptr == arg || 0 != *endptr || ERANGE == errno) return false;
         *(uint64_t *)val = d;
         return true;
     }

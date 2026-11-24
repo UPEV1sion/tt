@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 
 #include "common.h"
 
@@ -66,6 +67,7 @@ typedef struct {
         (sb)->count += len;                          \
     } while (0)
 
+
 #define da_foreach(type, name, da) for (type *name = (da)->items; name < (da)->items + (da)->count; ++name)
 
 #define da_sort(da, cmp) qsort((da)->items, (da)->count, sizeof(*(da)->items), cmp)
@@ -73,7 +75,7 @@ typedef struct {
 #define da_reverse(da)                                                              \
     do                                                                              \
     {                                                                               \
-        assert((da)->count > 0);                                                    \
+        if ((da)->count < 2) break;                                                 \
         size_t left  = 0;                                                           \
         size_t right = (da)->count - 1;                                             \
         while (left < right)                                                        \
@@ -81,7 +83,7 @@ typedef struct {
             uint8_t temp[sizeof(*(da)->items)];                                     \
             memcpy(temp, (da)->items + left, sizeof(*(da)->items));                 \
             memmove((da)->items + left, (da)->items + right, sizeof(*(da)->items)); \
-            memcpy((da)->items + left, temp, sizeof(*(da)->items));                 \
+            memcpy((da)->items + right, temp, sizeof(*(da)->items));                \
             left++;                                                                 \
             right--;                                                                \
         }                                                                           \
@@ -109,6 +111,8 @@ DADEF StringView sv_trim(StringView sv);
 DADEF char *cstr_from_sv(StringView sv);
 DADEF StringView sv_from_cstr(const char *s);
 DADEF int read_file(StringBuilder *sb, const char *path);
+
+DADEF void sb_appendf(StringBuilder *sb, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 
 #ifdef DA_IMPLEMENTATION
 
@@ -232,6 +236,20 @@ DADEF int read_file(StringBuilder *sb, const char *path)
 
     fclose(f);
     return 0;
+}
+
+DADEF void sb_appendf(StringBuilder *sb, const char *fmt, ...)
+{
+    va_list ap, ap2;
+    va_start(ap, fmt);
+    va_copy(ap2, ap);
+    const int n = vsnprintf(NULL, 0, fmt, ap);
+    va_end(ap);
+    assertmsg(n >= 0, "ERROR: vsnprintf failed\n");
+    da_reserve(sb, sb->count + (size_t)n + 1);
+    vsnprintf(sb->items + sb->count, (size_t)n + 1, fmt, ap2);
+    va_end(ap2);
+    sb->count += (size_t)n;
 }
 
 #endif // DA_IMPLEMENTATION

@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "common.h"
 #include "da.h"
@@ -69,16 +70,20 @@ bool task_contains_tag(const Task task, const char *tag)
 
 void dump_tasks(const Tasks *tasks, bool all_tasks, bool verbose)
 {
+    const bool color = isatty(STDOUT_FILENO) && !getenv("NO_COLOR");
     da_foreach(Task, task, tasks)
     {
         if (!all_tasks && CLOSED == task->status) continue;
 
-        switch (task->status)
+        if (color)
         {
-        case OPEN:        printf("\033[96m"); break; // blue
-        case IN_PROGRESS: printf("\033[93m"); break; // yellow
-        case CLOSED:      printf("\033[90m"); break; // gray
-        default:          assert(0 && "Unreachable");
+            switch (task->status)
+            {
+            case OPEN:        printf("\033[96m"); break; // blue
+            case IN_PROGRESS: printf("\033[93m"); break; // yellow
+            case CLOSED:      printf("\033[90m"); break; // gray
+            default:          assert(0 && "Unreachable");
+            }
         }
 
         printf("./tasks/%s/TASK.md: [STATUS: %s, PRIORITY: %ld", task->id, status_to_str(task->status), task->prio);
@@ -91,7 +96,6 @@ void dump_tasks(const Tasks *tasks, bool all_tasks, bool verbose)
                 printf(", " SV_FMT, SV_ARG(task->tags.items[i]));
             }
         }
-        // TODO(escha): validate references
         if (task->refs.count > 0)
         {
             printf(", REFERENCES: ");
@@ -101,9 +105,11 @@ void dump_tasks(const Tasks *tasks, bool all_tasks, bool verbose)
                 printf(", " SV_FMT, SV_ARG(task->refs.items[i]));
             }
         }
-        assertmsg(task->title.len >= 2, "ERROR: malformed title\"" SV_FMT "\"\n", SV_ARG(task->title));
-        const StringView tmp_title = {.s = task->title.s + 2, .len = task->title.len - 2};
-        printf("] " SV_FMT "\033[0m\n", SV_ARG(tmp_title));
+            const StringView tmp_title = task->title.len > 2 
+            ? (StringView) {.s = task->title.s + 2, .len = task->title.len - 2} 
+            : sv_from_cstr("(untitled");
+        printf("] " SV_FMT "\n", SV_ARG(tmp_title));
+        if (color) printf("\033[0m");
         if (verbose)
         {
             StringView content = sv_from_sb(&task->backing);
@@ -210,18 +216,25 @@ static Task parse_task(char *id)
         if (sv_is_prefix(meta, "- PRIORITY"))
         {
             sv_chop(&meta, ':');
-            char prio_buf[BUFSIZE];
-            size_t read      = 0;
-            size_t write     = 0;
-            const size_t len = meta.len < BUFSIZE ? meta.len : BUFSIZE;
-            while (isspace(meta.s[read])) read++;
-            while (write < len - 1 && isdigit(meta.s[read])) prio_buf[write++] = meta.s[read++];
-            prio_buf[write] = 0;
+            const StringView value = sv_trim(meta);
 
-            char *endptr   = NULL;
+            char prio_buf[32];
+            if (value.len == 0 || value.len >= sizeof prio_buf)
+            {
+                fprintf(stderr, "ERROR: Malformed \"PRIORITY\" header in %s\n", path);
+                exit(1);
+            }
+            memcpy(prio_buf, value.s, value.len);
+            prio_buf[value.len] = 0;
+
+            char *endptr = NULL;
+            errno        = 0;
             const long num = strtol(prio_buf, &endptr, 10);
-            assertmsg(*endptr == 0, "ERROR: count not parse priority: %s\n", prio_buf);
-
+            if (errno != 0 || *endptr != 0 || num < 0 || num > 100)
+            {
+                fprintf(stderr, "ERROR: Invalid priority \"%s\" in %s (expected 0-100)\n", prio_buf, path);
+                exit(1);
+            }
             task.prio = num;
         }
         else if (sv_is_prefix(meta, "- STATUS"))
@@ -264,11 +277,10 @@ static Task parse_task(char *id)
                 exit(1);
             }
 
-            StringView tag;
-            while ((tag = sv_chop(&trimmed, ',')).len > 0)
+            while (trimmed.len > 0)
             {
-                tag = sv_trim(tag);
-                da_append(&task.tags, tag);
+                const StringView tag = sv_trim(sv_chop(&trimmed, ','));
+                if (tag.len > 0) da_append(&task.tags, tag);
             }
         }
         else if (sv_is_prefix(meta, "- REFERENCES"))
@@ -281,11 +293,10 @@ static Task parse_task(char *id)
                 exit(1);
             }
 
-            StringView ref;
-            while ((ref = sv_chop(&trimmed, ',')).len > 0)
+            while (trimmed.len > 0)
             {
-                ref = sv_trim(ref);
-                da_append(&task.refs, ref);
+                const StringView tag = sv_trim(sv_chop(&trimmed, ','));
+                if (tag.len > 0) da_append(&task.refs, tag);
             }
         }
         else if (*meta.s == '-')
@@ -342,13 +353,15 @@ void load_tasks(Tasks *tasks)
 
 static void sort_topological(Tasks *tasks)
 {
+    size_t n = tasks->count;
+    if (0 == n) return;
+
     typedef struct {
         size_t count;
         size_t capacity;
         size_t *items;
     } AdjList;
 
-    size_t n            = tasks->count;
     HashTable id_to_idx = {0};
 
     for (size_t i = 0; i < n; ++i)
@@ -367,18 +380,18 @@ static void sort_topological(Tasks *tasks)
 
     for (size_t i = 0; i < n; ++i)
     {
-        in_edges[i] = tasks->items[i].refs.count;
         da_foreach(StringView, ref, &tasks->items[i].refs)
         {
             size_t target_idx = 0;
             if (ht_lookup(&id_to_idx, *ref, &target_idx) != 0)
             {
                 fprintf(stderr,
-                        "ERROR: task '%s' references unknown task '" SV_FMT "'\n",
-                        tasks->items[i].id,
-                        SV_ARG(*ref));
-                goto err;
+                    "WARNING: task '%s' references unknown task '" SV_FMT "', ignoring\n",
+                    tasks->items[i].id,
+                    SV_ARG(*ref));
+                continue;
             }
+            in_edges[i]++;
             da_append(&dependents[target_idx], i);
         }
     }
@@ -391,7 +404,7 @@ static void sort_topological(Tasks *tasks)
     }
 
     size_t placed     = 0;
-    ssize_t write_idx = 0;
+    size_t write_idx = 0;
 
     while (q_head < q_tail)
     {
@@ -427,7 +440,8 @@ static void sort_topological(Tasks *tasks)
     ht_free(&id_to_idx);
     da_free(tasks);
 
-    tasks->items = sorted;
+    tasks->items    = sorted;
+    tasks->capacity = n;
     return;
 
 err:
@@ -440,14 +454,14 @@ err:
     exit(1);
 }
 
-static int timestamp_cmp(const void *a, const void *b)
+static int prio_cmp(const void *a, const void *b)
 {
     const Task *task_a = (const Task *)a;
     const Task *task_b = (const Task *)b;
     return (task_b->prio > task_a->prio) - (task_b->prio < task_a->prio);
 }
 
-static int prio_cmp(const void *a, const void *b)
+static int timestamp_cmp(const void *a, const void *b)
 {
     const Task *task_a = (const Task *)a;
     const Task *task_b = (const Task *)b;

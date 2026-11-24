@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <unistd.h>
+#include <inttypes.h>
 
 #include "common.h"
 #include "da.h"
@@ -50,9 +51,6 @@ static void print_usage(const char *program)
 
 static int list_tasks(int argc, char **argv)
 {
-    Tasks tasks = {0};
-    load_tasks(&tasks);
-
     // clang-format off
     Flags flags = {0};
     char *filter;
@@ -80,29 +78,29 @@ static int list_tasks(int argc, char **argv)
     }
     flag_free(&flags);
     // clang-format on
+    
+    Ops ops = {0};
+    if (filter)
+    {
+        Lexer *lexer = lexer_new(filter);
+        if (!lexer) return 1;
+        parse_expr(lexer, &ops);
+        lexer_free(lexer);
+    }
 
-    SortOptions sort_options = {0};
+    SortOptions sort_options;
     sort_options.order       = reverse ? SORT_ORDER_ASC : SORT_ORDER_DESC;
     if (prio_sort) sort_options.target = SORT_PRIO;
     if (date_sort) sort_options.target = SORT_TIMESTAMP;
     if (topo_sort) sort_options.target = SORT_TOPOLOGICAL;
-    if (filter)
-    {
-        Lexer *lexer = lexer_new(filter);
-        if (!lexer) goto defer;
 
-        Ops ops = {0};
-        parse_expr(lexer, &ops);
-        filter_tasks(&tasks, &ops);
-
-        op_free(&ops);
-        lexer_free(lexer);
-    }
-
+    Tasks tasks = {0};
+    load_tasks(&tasks);
     sort_tasks(&tasks, sort_options);
+    if(filter) filter_tasks(&tasks, &ops);
     dump_tasks(&tasks, all_tasks, verbose);
 
-defer:
+    op_free(&ops);
     free_tasks(&tasks);
 
     return 0;
@@ -110,30 +108,18 @@ defer:
 
 static void append_missing(StringBuilder *out, const char *tags, bool has_tags, const char *refs, bool has_refs)
 {
-    char buf[BUFSIZE];
-    if (tags && *tags && !has_tags)
-    {
-        const int len = snprintf(buf, sizeof buf, "- TAGS: %s\n", tags);
-        assert(len >= 0);
-        da_append_many(out, buf, (size_t)len);
-    }
-    if (refs && *refs && !has_refs)
-    {
-        const int len = snprintf(buf, sizeof buf, "- REFERENCES: %s\n", refs);
-        assert(len >= 0);
-        da_append_many(out, buf, (size_t)len);
-    }
+    if (tags && *tags && !has_tags) sb_appendf(out, "- TAGS: %s\n", tags);
+    if (refs && *refs && !has_refs) sb_appendf(out, "- REFERENCES: %s\n", refs);
 }
 
 static int edit_task(int argc, char **argv)
 {
-    // TODO(escha): make this atomic
     const char *task_id = shift_args(argc, argv);
 
     char *new_status = NULL;
     char *new_tags   = NULL;
     char *new_refs   = NULL;
-    long new_prio    = -1;
+    int64_t new_prio = -1;
     bool help        = false;
 
     // clang-format off
@@ -150,7 +136,7 @@ static int edit_task(int argc, char **argv)
         flag_free(&flags);
         return 1;
     }
-
+    bool prio_set = flag_seen(&flags, "-p", "--priority");
     if (help || argc <= 0)
     {
         flag_print_info(&flags, "EDIT FLAGS");
@@ -159,6 +145,7 @@ static int edit_task(int argc, char **argv)
     }
     // clang-format on
 
+    // TODO err/defer goto
     if (new_status)
     {
         static_assert(status_count_ == 3, "status count has changed");
@@ -167,18 +154,23 @@ static int edit_task(int argc, char **argv)
         {
             fprintf(stderr, "ERROR: Invalid status \"%s\"\n", new_status);
             fprintf(stderr, "ERROR: Available options: \"OPEN\", \"IN_PROGRESS\", \"CLOSED\"\n");
+            flag_free(&flags);
             return 1;
         }
     }
-    if (new_prio >= 0)
+
+    if (prio_set && (new_prio < 0 || new_prio > 100))
     {
-        assertmsg(new_prio >= 0 && new_prio <= 100, "ERROR: Invalid priority (0-100)\n");
+        fprintf(stderr, "ERROR: Invalid priority %" PRId64 " (allowed range: 0-100)\n", new_prio);
+        flag_free(&flags);
+        return 1;
     }
 
-    if (!new_status && new_prio == -1 && !new_tags && !new_refs)
+    if (!new_status && !prio_set && !new_tags && !new_refs)
     {
         fprintf(stderr, "WARNING: Nothing to edit.\n");
         flag_print_info(&flags, "EDIT FLAGS");
+        flag_free(&flags);
         return 0;
     }
 
@@ -219,17 +211,11 @@ static int edit_task(int argc, char **argv)
         }
         else if (sv_is_prefix(line, "- STATUS") && new_status)
         {
-            char buf[128];
-            const int len = snprintf(buf, sizeof(buf), "- STATUS: %s\n", new_status);
-            assert(len >= 0);
-            da_append_many(&output, buf, (size_t)len);
+            sb_appendf(&output, "- STATUS: %s\n", new_status);
         }
-        else if (sv_is_prefix(line, "- PRIORITY") && new_prio != -1)
+        else if (sv_is_prefix(line, "- PRIORITY") && prio_set)
         {
-            char buf[128];
-            const int len = snprintf(buf, sizeof(buf), "- PRIORITY: %ld\n", new_prio);
-            assert(len >= 0);
-            da_append_many(&output, buf, (size_t)len);
+            sb_appendf(&output, "- PRIORITY: %" PRId64 "\n", new_prio);
         }
         else if (sv_is_prefix(line, "- TAGS"))
         {
@@ -241,10 +227,7 @@ static int edit_task(int argc, char **argv)
             }
             else if (*new_tags)
             {
-                char buf[BUFSIZE];
-                const int len = snprintf(buf, sizeof(buf), "- TAGS: %s\n", new_tags);
-                assert(len >= 0);
-                da_append_many(&output, buf, (size_t)len);
+                sb_appendf(&output, "- TAGS: %s\n", new_tags);
             }
         }
         else if (sv_is_prefix(line, "- REFERENCES"))
@@ -257,10 +240,7 @@ static int edit_task(int argc, char **argv)
             }
             else if (*new_refs)
             {
-                char buf[BUFSIZE];
-                const int len = snprintf(buf, sizeof(buf), "- REFERENCES: %s\n", new_refs);
-                assert(len >= 0);
-                da_append_many(&output, buf, (size_t)len);
+                sb_appendf(&output, "- REFERENCES: %s\n", new_refs);
             }
         }
         else
