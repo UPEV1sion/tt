@@ -1,15 +1,15 @@
+#include <dirent.h>
+#include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include <sys/types.h>
 #include <sys/stat.h>
-#include <dirent.h>
+#include <sys/types.h>
 #include <time.h>
-#include <errno.h>
 
-#include "task.h"
 #include "common.h"
 #include "da.h"
 #include "ht.h"
+#include "task.h"
 
 static const char *status_to_str(const TaskStatus status)
 {
@@ -172,13 +172,15 @@ void create_new_task(void)
 
     snprintf(path + offset, BUFSIZE - (size_t)offset, "TASK.md");
     FILE *fp = NULL;
-    assertmsg((fp = fopen(path, "w" "e")) != NULL, "ERROR: Could not open \"%s\" for writing\n", path);
+    assertmsg((fp = fopen(path, "we")) != NULL,
+              "ERROR: Could not open \"%s\" for writing\n",
+              path);
 
     fprintf(fp, "# %s\n\n", title);
     fprintf(fp, "- STATUS: %s\n", status);
     fprintf(fp, "- PRIORITY: %ld\n", prio);
-    if (strlen(tags) > 0)  fprintf(fp, "- TAGS: %s\n", tags);
-    if (strlen(refs) > 0)  fprintf(fp, "- REFERENCES: %s\n", refs);
+    if (strlen(tags) > 0) fprintf(fp, "- TAGS: %s\n", tags);
+    if (strlen(refs) > 0) fprintf(fp, "- REFERENCES: %s\n", refs);
 
     fclose(fp);
 
@@ -196,9 +198,9 @@ static Task parse_task(char *id)
 
     const StringView title = sv_chop(&sv, '\n');
     Task task              = {
-        .title   = title,
-        .id      = id,
-        .backing = sb,
+                     .title   = title,
+                     .id      = id,
+                     .backing = sb,
     };
     sv_chop(&sv, '\n');
 
@@ -212,15 +214,11 @@ static Task parse_task(char *id)
             size_t read      = 0;
             size_t write     = 0;
             const size_t len = meta.len < BUFSIZE ? meta.len : BUFSIZE;
-            while (isspace(meta.s[read])) { read++;
-}
-            while (write < len - 1 && isdigit(meta.s[read]))
-            {
-                prio_buf[write++] = meta.s[read++];
-            }
+            while (isspace(meta.s[read])) read++;
+            while (write < len - 1 && isdigit(meta.s[read])) prio_buf[write++] = meta.s[read++];
             prio_buf[write] = 0;
 
-            char *endptr = NULL;
+            char *endptr   = NULL;
             const long num = strtol(prio_buf, &endptr, 10);
             assertmsg(*endptr == 0, "ERROR: count not parse priority: %s\n", prio_buf);
 
@@ -312,7 +310,7 @@ void load_tasks(Tasks *tasks)
         fprintf(stderr, "ERROR: No \"tasks\" folder found!\n");
         return;
     }
-    errno = 0;
+    errno                    = 0;
     struct dirent *dir_entry = NULL;
     while ((dir_entry = readdir(dir)) != NULL)
     {
@@ -349,7 +347,6 @@ static void sort_topological(Tasks *tasks)
         size_t capacity;
         size_t *items;
     } AdjList;
-
 
     size_t n            = tasks->count;
     HashTable id_to_idx = {0};
@@ -393,8 +390,8 @@ static void sort_topological(Tasks *tasks)
         if (0 == in_edges[i]) queue[q_tail++] = i;
     }
 
-    size_t placed      = 0;
-    ssize_t write_idx  = 0;
+    size_t placed     = 0;
+    ssize_t write_idx = 0;
 
     while (q_head < q_tail)
     {
@@ -434,8 +431,7 @@ static void sort_topological(Tasks *tasks)
     return;
 
 err:
-    for (size_t k = 0; k < n; ++k) { da_free(&dependents[k]);
-}
+    for (size_t k = 0; k < n; ++k) da_free(&dependents[k]);
     free(dependents);
     free(sorted);
     free(queue);

@@ -4,9 +4,9 @@
 
 #include <ctype.h>
 #include <dirent.h>
+#include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include <errno.h>
 #include <unistd.h>
 
 #include "common.h"
@@ -55,8 +55,8 @@ static int list_tasks(int argc, char **argv)
 
     // clang-format off
     Flags flags = {0};
-    char *filter = NULL;
-    bool date_sort = false, prio_sort = false, topo_sort = false, reverse = false, all_tasks = false, verbose = false, help = false;
+    char *filter;
+    bool date_sort, prio_sort, topo_sort, reverse, all_tasks, verbose, help;
     flag_decl_str(&flags,  &filter,    "-f", "--filter",   NULL,  "Filter tasks using the query language");
     flag_decl_bool(&flags, &date_sort, "-d", "--date",     false, "Sort by creation date (descending)");
     flag_decl_bool(&flags, &prio_sort, "-p", "--priority", true,  "Sort by priority (descending, default)");
@@ -83,17 +83,13 @@ static int list_tasks(int argc, char **argv)
 
     SortOptions sort_options = {0};
     sort_options.order       = reverse ? SORT_ORDER_ASC : SORT_ORDER_DESC;
-    if (prio_sort) { sort_options.target = SORT_PRIO;
-}
-    if (date_sort) { sort_options.target = SORT_TIMESTAMP;
-}
-    if (topo_sort) { sort_options.target = SORT_TOPOLOGICAL;
-}
+    if (prio_sort) sort_options.target = SORT_PRIO;
+    if (date_sort) sort_options.target = SORT_TIMESTAMP;
+    if (topo_sort) sort_options.target = SORT_TOPOLOGICAL;
     if (filter)
     {
         Lexer *lexer = lexer_new(filter);
-        if (!lexer) { goto defer;
-}
+        if (!lexer) goto defer;
 
         Ops ops = {0};
         parse_expr(lexer, &ops);
@@ -138,7 +134,7 @@ static int edit_task(int argc, char **argv)
     char *new_tags   = NULL;
     char *new_refs   = NULL;
     long new_prio    = -1;
-    bool help = false;
+    bool help        = false;
 
     // clang-format off
     Flags flags = {0};
@@ -274,8 +270,7 @@ static int edit_task(int argc, char **argv)
         }
     }
 
-    if (!preamble_passed) { append_missing(&output, new_tags, has_tags, new_refs, has_refs);
-}
+    if (!preamble_passed) append_missing(&output, new_tags, has_tags, new_refs, has_refs);
 
     FILE *fp = fopen(tmp_path, "wbe");
     if (!fp)

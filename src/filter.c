@@ -2,12 +2,11 @@
 // Created by escha on 28.03.26.
 //
 
-
+#include "filter.h"
 #include "arena.h"
 #include "common.h"
 #include "da.h"
 #include "task.h"
-#include "filter.h"
 
 #define error(input, caret_pos, ...)                   \
     do                                                 \
@@ -436,4 +435,3 @@ void filter_tasks(Tasks *tasks, Ops *ops)
     }
     da_free(&stack);
 }
-
