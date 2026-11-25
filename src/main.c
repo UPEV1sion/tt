@@ -5,10 +5,10 @@
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <unistd.h>
-#include <inttypes.h>
 
 #include "common.h"
 #include "da.h"
@@ -54,7 +54,7 @@ static int list_tasks(int argc, char **argv)
     // clang-format off
     Flags flags = {0};
     char *filter;
-    bool date_sort, prio_sort, topo_sort, reverse, all_tasks, verbose, help;
+    bool date_sort, prio_sort, topo_sort, reverse, all_tasks, verbose;
     flag_decl_str(&flags,  &filter,    "-f", "--filter",   NULL,  "Filter tasks using the query language");
     flag_decl_bool(&flags, &date_sort, "-d", "--date",     false, "Sort by creation date (descending)");
     flag_decl_bool(&flags, &prio_sort, "-p", "--priority", true,  "Sort by priority (descending, default)");
@@ -62,23 +62,16 @@ static int list_tasks(int argc, char **argv)
     flag_decl_bool(&flags, &reverse,   "-i", "--inverse",  false, "Inverse the sorting order (ascending)");
     flag_decl_bool(&flags, &all_tasks, "-a", "--all",      false, "Display all tasks, even the closed ones");
     flag_decl_bool(&flags, &verbose,   "-v", "--verbose",  false, "Display the whole task file");
-    flag_decl_bool(&flags, &help,      "-h", "--help",     false, "Display help for the list subcommand");
-    assert(flags.count == 8 && "flags changed, remember to change README and print_usage!");
+    assert(flags.count == 7 && "flags changed, remember to change README and print_usage!");
     if (flag_parse(&flags, argc, argv) != 0)
     {
         flag_print_info(&flags, "LIST FLAGS");
         flag_free(&flags);
         return 1;
     }
-    if (help)
-    {
-        flag_print_info(&flags, "LIST FLAGS");
-        flag_free(&flags);
-        return 0;
-    }
     flag_free(&flags);
     // clang-format on
-    
+
     Ops ops = {0};
     if (filter)
     {
@@ -89,7 +82,7 @@ static int list_tasks(int argc, char **argv)
     }
 
     SortOptions sort_options;
-    sort_options.order       = reverse ? SORT_ORDER_ASC : SORT_ORDER_DESC;
+    sort_options.order = reverse ? SORT_ORDER_ASC : SORT_ORDER_DESC;
     if (prio_sort) sort_options.target = SORT_PRIO;
     if (date_sort) sort_options.target = SORT_TIMESTAMP;
     if (topo_sort) sort_options.target = SORT_TOPOLOGICAL;
@@ -97,7 +90,7 @@ static int list_tasks(int argc, char **argv)
     Tasks tasks = {0};
     load_tasks(&tasks);
     sort_tasks(&tasks, sort_options);
-    if(filter) filter_tasks(&tasks, &ops);
+    if (filter) filter_tasks(&tasks, &ops);
     dump_tasks(&tasks, all_tasks, verbose);
 
     op_free(&ops);
@@ -120,7 +113,6 @@ static int edit_task(int argc, char **argv)
     char *new_tags   = NULL;
     char *new_refs   = NULL;
     int64_t new_prio = -1;
-    bool help        = false;
 
     // clang-format off
     Flags flags = {0};
@@ -128,16 +120,15 @@ static int edit_task(int argc, char **argv)
     flag_decl_int(&flags,  &new_prio,   "-p", "--priority",   -1,    "Set task priority (0-100)");
     flag_decl_str(&flags,  &new_tags,   "-t", "--tags",       NULL,  "Override tasks tags (comma-separated)");
     flag_decl_str(&flags,  &new_refs,   "-r", "--references", NULL,  "Override tasks references (comma-separated)");
-    flag_decl_bool(&flags, &help,       "-h", "--help",       false, "Display help for the edit subcommand");
-    assert(flags.count == 5 && "flags changed, remember to change README and print_usage!");
+    assert(flags.count == 4 && "flags changed, remember to change README and print_usage!");
     if (flag_parse(&flags, argc, argv) != 0)
     {
         flag_print_info(&flags, "EDIT FLAGS");
         flag_free(&flags);
         return 1;
     }
-    bool prio_set = flag_seen(&flags, "-p", "--priority");
-    if (help || argc <= 0)
+    bool prio_set = flag_seen(&flags, &new_prio);
+    if (argc <= 0)
     {
         flag_print_info(&flags, "EDIT FLAGS");
         flag_free(&flags);

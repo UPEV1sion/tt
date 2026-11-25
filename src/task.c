@@ -105,9 +105,9 @@ void dump_tasks(const Tasks *tasks, bool all_tasks, bool verbose)
                 printf(", " SV_FMT, SV_ARG(task->refs.items[i]));
             }
         }
-            const StringView tmp_title = task->title.len > 2 
-            ? (StringView) {.s = task->title.s + 2, .len = task->title.len - 2} 
-            : sv_from_cstr("(untitled");
+        const StringView tmp_title = task->title.len > 2
+                                         ? (StringView){.s = task->title.s + 2, .len = task->title.len - 2}
+                                         : sv_from_cstr("(untitled");
         printf("] " SV_FMT "\n", SV_ARG(tmp_title));
         if (color) printf("\033[0m");
         if (verbose)
@@ -178,9 +178,7 @@ void create_new_task(void)
 
     snprintf(path + offset, BUFSIZE - (size_t)offset, "TASK.md");
     FILE *fp = NULL;
-    assertmsg((fp = fopen(path, "we")) != NULL,
-              "ERROR: Could not open \"%s\" for writing\n",
-              path);
+    assertmsg((fp = fopen(path, "we")) != NULL, "ERROR: Could not open \"%s\" for writing\n", path);
 
     fprintf(fp, "# %s\n\n", title);
     fprintf(fp, "- STATUS: %s\n", status);
@@ -227,8 +225,8 @@ static Task parse_task(char *id)
             memcpy(prio_buf, value.s, value.len);
             prio_buf[value.len] = 0;
 
-            char *endptr = NULL;
-            errno        = 0;
+            char *endptr   = NULL;
+            errno          = 0;
             const long num = strtol(prio_buf, &endptr, 10);
             if (errno != 0 || *endptr != 0 || num < 0 || num > 100)
             {
@@ -386,9 +384,9 @@ static void sort_topological(Tasks *tasks)
             if (ht_lookup(&id_to_idx, *ref, &target_idx) != 0)
             {
                 fprintf(stderr,
-                    "WARNING: task '%s' references unknown task '" SV_FMT "', ignoring\n",
-                    tasks->items[i].id,
-                    SV_ARG(*ref));
+                        "WARNING: task '%s' references unknown task '" SV_FMT "', ignoring\n",
+                        tasks->items[i].id,
+                        SV_ARG(*ref));
                 continue;
             }
             in_edges[i]++;
@@ -403,7 +401,7 @@ static void sort_topological(Tasks *tasks)
         if (0 == in_edges[i]) queue[q_tail++] = i;
     }
 
-    size_t placed     = 0;
+    size_t placed    = 0;
     size_t write_idx = 0;
 
     while (q_head < q_tail)

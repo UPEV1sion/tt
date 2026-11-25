@@ -6,11 +6,11 @@
 #define DA_H_
 
 #include <ctype.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdarg.h>
 
 #include "common.h"
 
@@ -66,7 +66,6 @@ typedef struct {
         memcpy((sb)->items + (sb)->count, (s), len); \
         (sb)->count += len;                          \
     } while (0)
-
 
 #define da_foreach(type, name, da) for (type *name = (da)->items; name < (da)->items + (da)->count; ++name)
 

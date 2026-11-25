@@ -1,6 +1,6 @@
 CC := gcc
-CFLAGS := -Wall -Wextra -Werror -Wconversion -Wformat=2 -pedantic -std=c17 -O3
-CPPFLAGS := -MMD -MP -D_POSIX_C_SOURCE=200809L
+CFLAGS := -Wall -Wextra -Werror -Wconversion -Wformat=2 -pedantic -std=c17 -ggdb
+CPPFLAGS := -MMD -MP -D_POSIX_C_SOURCE=200809L -DFLAG_NO_PROGRAM_NAME
 
 DESTDIR  := build
 TARGET   := tt

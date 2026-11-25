@@ -82,7 +82,7 @@ ARDEF char *arena_strdup(Arena *arena, const char *s)
 {
     const size_t len = strlen(s);
     char *buf        = arena_alloc(arena, len + 1);
-    if(!buf) return NULL;
+    if (!buf) return NULL;
     memcpy(buf, s, len + 1);
 
     return buf;

@@ -41,12 +41,14 @@
 
       devShells.default = pkgs.mkShell {
         buildInputs = with pkgs; [
+          fish
           gnumake
           gcc
           clang
           (python3.withPackages (p: [ p.pytest ]))
           valgrind
         ];
+        shellHook = "fish";
       };
     }
   );
